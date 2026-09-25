@@ -122,16 +122,12 @@ local sectionBlocks = {}
 local allSectionRows = {}
 local widgetIndex = {}   -- id -> {widgetID=..., labelID=..., ctrl=...}
 
-for si, sec in ipairs(DATA.SECTIONS) do
-    if sec.id ~= "SecPresets" then
-        local rows = {}
-        for ci, ctrl in ipairs(sec.controls) do
-            if ctrl.kind ~= "button" then
-                local widgetID = string.format("w_%s", ctrl.id)
-                local labelID = "l_" .. ctrl.id
-                widgetIndex[ctrl.id] = { widgetID = widgetID, labelID = labelID, ctrl = ctrl }
-
-                if ctrl.id == "PixPattern" then
+-- Собрать один ряд параметра — вынесено в функцию, чтобы обернуть в pcall:
+-- если конкретный параметр почему-то сломан (нет на ноде, битые данные),
+-- вся панель не падает, а этот один ряд заменяется меткой с ошибкой.
+local function buildControlRow(ctrl, widgetID, labelID)
+    local rows = {}
+    if ctrl.id == "PixPattern" then
                     -- Специальная сетка иконок вместо обычного дропдауна.
                     local icons = {}
                     for oi = 0, #ctrl.options - 1 do
@@ -178,7 +174,7 @@ for si, sec in ipairs(DATA.SECTIONS) do
                     for _, ch in ipairs({ "Red", "Green", "Blue" }) do
                         local subID = "w_" .. ctrl.id .. ch
                         local subLbl = "l_" .. ctrl.id .. ch
-                        local v = readVal(ctrl.id .. ch) or 0
+                        local v = num(readVal(ctrl.id .. ch), 0)
                         widgetIndex[ctrl.id .. ch] = { widgetID = subID, labelID = subLbl,
                             ctrl = { id = ctrl.id .. ch, kind = "slider", lo = 0, hi = 2, name = ctrl.name .. ": " .. ch } }
                         table.insert(rows, ui:HGroup{
@@ -188,6 +184,27 @@ for si, sec in ipairs(DATA.SECTIONS) do
                             ui:Label{ ID = subLbl, Text = string.format("%.3f", v), MinimumSize = { 55, 0 } },
                         })
                     end
+    end
+    return rows
+end
+
+for si, sec in ipairs(DATA.SECTIONS) do
+    if sec.id ~= "SecPresets" then
+        local rows = {}
+        for ci, ctrl in ipairs(sec.controls) do
+            if ctrl.kind ~= "button" then
+                local widgetID = string.format("w_%s", ctrl.id)
+                local labelID = "l_" .. ctrl.id
+                widgetIndex[ctrl.id] = { widgetID = widgetID, labelID = labelID, ctrl = ctrl }
+
+                local ok, result = pcall(buildControlRow, ctrl, widgetID, labelID)
+                if ok and result then
+                    for _, r in ipairs(result) do table.insert(rows, r) end
+                else
+                    widgetIndex[ctrl.id] = nil
+                    print(string.format("[CRT Pro Panel] Параметр %s (%s) пропущен из-за ошибки: %s",
+                        ctrl.id, ctrl.name, tostring(result)))
+                    table.insert(rows, ui:Label{ Text = "⚠ " .. ctrl.name .. " — не удалось построить (см. консоль)", Weight = 0 })
                 end
             end
         end
@@ -235,10 +252,15 @@ for _, sec in ipairs(DATA.SECTIONS) do
     for _, ctrl in ipairs(sec.controls) do
         if ctrl.kind == "combo" and ctrl.id ~= "PresetSel" and ctrl.id ~= "PixPattern" then
             local w = widgetIndex[ctrl.id]
-            if w then
-                for _, opt in ipairs(ctrl.options) do itm[w.widgetID]:AddItem(opt) end
-                local v = readVal(ctrl.id) or ctrl.default
-                itm[w.widgetID].CurrentIndex = math.floor(v + 0.5)
+            if w and itm[w.widgetID] then
+                local okFill, err = pcall(function()
+                    for _, opt in ipairs(ctrl.options or {}) do itm[w.widgetID]:AddItem(opt) end
+                    local v = num(readVal(ctrl.id), num(ctrl.default, 0))
+                    itm[w.widgetID].CurrentIndex = math.floor(v + 0.5)
+                end)
+                if not okFill then
+                    print("[CRT Pro Panel] Дропдаун " .. ctrl.id .. " не заполнился: " .. tostring(err))
+                end
             end
         end
     end
