@@ -91,13 +91,20 @@ for key, input in pairs(rawInputs) do
                 local cur = nil
                 local okVal, val = pcall(function() return input[0] end) -- значение на текущем кадре (числовое/текст)
 
-                if dataType == "Number" then
+                local inputControl = attrs.INPID_InputControl or ""
+
+                if dataType == "Number" and inputControl == "CheckboxControl" then
+                    -- Настоящий чекбокс (галочка "Включить" и т.п.), хоть и хранится
+                    -- как Number 0/1 — по типу контрола видно, что это булево.
+                    kind = "checkbox"
+                    cur = okVal and val or 0
+                elseif dataType == "Number" then
                     kind = "number"
                     cur = okVal and val or 0
-                elseif dataType == "FuID" then
-                    -- Может быть чекбокс (Boolean под капотом отдаёт 0/1) либо режим (строка).
-                    kind = "fuid"
-                    cur = okVal and val or ""
+                elseif dataType == "FuID" and inputControl == "ComboControl" then
+                    -- Выпадающий список (режим/узор) — пока не рисуем, нужно отдельно
+                    -- читать список вариантов, пропускаем без падения.
+                    kind = "combo"
                 elseif dataType == "Point" then
                     kind = "point"
                 elseif dataType == "Image" then
@@ -106,13 +113,20 @@ for key, input in pairs(rawInputs) do
                     kind = "other"
                 end
 
-                if kind == "number" or kind == "fuid" then
+                if kind == "number" or kind == "checkbox" then
+                    -- Реальный диапазон значений ноды, а не выдуманный -100..100.
+                    local lo = attrs.INP_MinScale or attrs.INP_MinAllowed
+                    local hi = attrs.INP_MaxScale or attrs.INP_MaxAllowed
+                    if kind == "checkbox" then lo, hi = 0, 1 end
+                    if not lo or not hi or lo >= hi then lo, hi = 0, 1 end
+
                     table.insert(controls, {
                         id = id,
                         name = name,
                         kind = kind,
                         value = cur,
-                        min = attrs.INPID_InputControl == "SliderControl" and 0 or nil,
+                        min = lo,
+                        max = hi,
                     })
                 end
             end
@@ -121,6 +135,22 @@ for key, input in pairs(rawInputs) do
 end
 
 table.sort(controls, function(a, b) return a.name < b.name end)
+
+-- Если название повторяется (например, "Включить" у каждого раздела) —
+-- добавляем внутренний ID в скобках, иначе непонятно, какой чекбокс к чему.
+do
+    local nameCount = {}
+    for _, ctrl in ipairs(controls) do
+        nameCount[ctrl.name] = (nameCount[ctrl.name] or 0) + 1
+    end
+    for _, ctrl in ipairs(controls) do
+        if nameCount[ctrl.name] > 1 then
+            ctrl.displayName = ctrl.name .. " (" .. ctrl.id .. ")"
+        else
+            ctrl.displayName = ctrl.name
+        end
+    end
+end
 
 print(string.format("[CRT Pro Panel] Найдено параметров для панели: %d", #controls))
 
@@ -143,16 +173,21 @@ for i, ctrl in ipairs(controls) do
     local labelID = "lbl_" .. i
 
     if ctrl.kind == "number" then
+        -- Слайдер работает в целых числах 0..1000, реальное значение
+        -- пересчитываем в min..max — так двигается плавно на всём диапазоне
+        -- ноды, а не на выдуманном -100..100.
+        local span = ctrl.max - ctrl.min
+        local sliderVal = math.floor(((ctrl.value - ctrl.min) / span) * 1000 + 0.5)
         table.insert(rows, ui:HGroup{
             Weight = 0,
-            ui:Label{ Text = ctrl.name, MinimumSize = { 160, 0 } },
-            ui:Slider{ ID = sliderID, Min = -100, Max = 100, Value = ctrl.value, MinimumSize = { 140, 0 } },
-            ui:Label{ ID = labelID, Text = string.format("%.2f", ctrl.value), MinimumSize = { 50, 0 } },
+            ui:Label{ Text = ctrl.displayName, MinimumSize = { 200, 0 } },
+            ui:Slider{ ID = sliderID, Min = 0, Max = 1000, Value = sliderVal, MinimumSize = { 140, 0 } },
+            ui:Label{ ID = labelID, Text = string.format("%.3f", ctrl.value), MinimumSize = { 55, 0 } },
         })
-    else -- fuid — чаще всего чекбокс 0/1
+    else -- checkbox
         table.insert(rows, ui:HGroup{
             Weight = 0,
-            ui:Label{ Text = ctrl.name, MinimumSize = { 160, 0 } },
+            ui:Label{ Text = ctrl.displayName, MinimumSize = { 200, 0 } },
             ui:CheckBox{ ID = sliderID, Checked = (tostring(ctrl.value) == "1" or ctrl.value == true) },
         })
     end
@@ -198,8 +233,10 @@ for i, ctrl in ipairs(controls) do
 
     if ctrl.kind == "number" then
         win.On[sliderID].ValueChanged = function(ev)
-            local v = itm[sliderID].Value
-            itm[labelID].Text = string.format("%.2f", v)
+            local raw = itm[sliderID].Value -- 0..1000
+            local span = capturedCtrl.max - capturedCtrl.min
+            local v = capturedCtrl.min + (raw / 1000) * span
+            itm[labelID].Text = string.format("%.3f", v)
             comp:StartUndo("CRT Pro Panel: " .. capturedCtrl.name)
             crtTool[capturedCtrl.id] = v
             comp:EndUndo(true)
@@ -221,8 +258,10 @@ function win.On.RefreshBtn.Clicked(ev)
         local okVal, val = pcall(function() return crtTool[ctrl.id] end)
         if okVal then
             if ctrl.kind == "number" then
-                itm["ctrl_" .. i].Value = val
-                itm["lbl_" .. i].Text = string.format("%.2f", val)
+                local span = ctrl.max - ctrl.min
+                local raw = math.floor(((val - ctrl.min) / span) * 1000 + 0.5)
+                itm["ctrl_" .. i].Value = raw
+                itm["lbl_" .. i].Text = string.format("%.3f", val)
             else
                 itm["ctrl_" .. i].Checked = (tostring(val) == "1")
             end
