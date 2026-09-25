@@ -127,21 +127,12 @@ local widgetIndex = {}   -- id -> {widgetID=..., labelID=..., ctrl=...}
 -- вся панель не падает, а этот один ряд заменяется меткой с ошибкой.
 local function buildControlRow(ctrl, widgetID, labelID)
     local rows = {}
-    if ctrl.id == "PixPattern" then
-                    -- Специальная сетка иконок вместо обычного дропдауна.
-                    local icons = {}
-                    for oi = 0, #ctrl.options - 1 do
-                        table.insert(icons, ui:Button{
-                            ID = "pat_" .. oi, Text = "", Icon = icon("pattern_" .. oi),
-                            IconSize = { 46, 26 }, ToolTip = ctrl.options[oi + 1],
-                            Weight = 0, MinimumSize = { 50, 40 },
-                        })
-                    end
-                    table.insert(rows, ui:VGroup{ Weight = 0,
-                        ui:Label{ Text = ctrl.name },
-                        ui:HGroup{ Weight = 0, tunpack(icons) },
-                    })
-                elseif ctrl.kind == "slider" then
+    -- v5: сетку иконок для "Узор" убрал — она ломала раскладку аккордеона
+    -- (все параметры схлопывались в одну точку). Пока "Узор" — обычный
+    -- дропдаун, как остальные combo-параметры. Иконки узоров остаются
+    -- в icons/pattern_*.png на будущее — можно будет попробовать другой
+    -- способ их встроить отдельным шагом.
+    if ctrl.kind == "slider" then
                     local lo = num(ctrl.lo, 0)
                     local hi = num(ctrl.hi, 1)
                     if hi <= lo then hi = lo + 1 end
@@ -250,7 +241,7 @@ local itm = win:GetItems()
 -- Наполнить дропдауны опциями (после создания окна, когда itm доступен).
 for _, sec in ipairs(DATA.SECTIONS) do
     for _, ctrl in ipairs(sec.controls) do
-        if ctrl.kind == "combo" and ctrl.id ~= "PresetSel" and ctrl.id ~= "PixPattern" then
+        if ctrl.kind == "combo" and ctrl.id ~= "PresetSel" then
             local w = widgetIndex[ctrl.id]
             if w and itm[w.widgetID] then
                 local okFill, err = pcall(function()
@@ -331,13 +322,6 @@ for id, w in pairs(widgetIndex) do
         win.On[w.widgetID].CurrentIndexChanged = function(ev)
             setValue(id, itm[w.widgetID].CurrentIndex)
         end
-    end
-end
-
--- Иконки узоров пикселей.
-for oi = 0, 9 do
-    win.On["pat_" .. oi].Clicked = function(ev)
-        setValue("PixPattern", oi)
     end
 end
 
