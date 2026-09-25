@@ -158,22 +158,25 @@ for i, ctrl in ipairs(controls) do
     end
 end
 
-local scrollContent = ui:VGroup{ ID = "scrollRoot" }
-for _, row in ipairs(rows) do
-    table.insert(scrollContent, row)
-end
+-- Совместимость: Fusion использует Lua 5.1, где функция называется unpack(),
+-- а не table.unpack() (это добавили только в Lua 5.2+).
+local tunpack = table.unpack or unpack
+
+-- Собираем колонку параметров вручную (VGroup — не Lua-таблица, а виджет,
+-- в него нельзя делать table.insert напрямую — только передавать элементы
+-- при создании, через unpack списка).
+local rowsGroup = ui:VGroup{ ID = "rowsGroup", tunpack(rows) }
 
 local win = disp:AddWindow({
     ID = "CRTProPanelWin",
     WindowTitle = "CRT Pro — " .. crtTool.Name,
-    Geometry = { 80, 80, 420, 600 },
+    Geometry = { 80, 80, 460, 800 },
     Spacing = 6,
 
     ui:VGroup{
-        ui:Label{ Text = "CRT Pro — свой плавающий Inspector", Alignment = { AlignHCenter = true } },
-        ui:TextEdit{ ID = "log", ReadOnly = true, MaximumSize = { 2000, 0 }, Text = "" },
-        ui:Tree{ ID = "unused", Hidden = true }, -- (место для будущего дерева пресетов)
-        table.unpack(rows),
+        ui:Label{ Text = "CRT Pro — свой плавающий Inspector (тяни за угол, чтобы растянуть)", Alignment = { AlignHCenter = true }, WordWrap = true },
+        ui:TextEdit{ ID = "log", ReadOnly = true, MaximumSize = { 2000, 60 }, Text = "" },
+        rowsGroup,
         ui:HGroup{
             Weight = 0,
             ui:Button{ ID = "RefreshBtn", Text = "Обновить из ноды" },
