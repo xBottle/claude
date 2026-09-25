@@ -75,7 +75,17 @@ local tunpack = table.unpack or unpack
 
 local function readVal(id)
     local ok, v = pcall(function() return crtTool[id] end)
-    return ok and v or nil
+    if not ok then return nil end
+    return v -- может быть nil, false, число — не подменяем через "or", чтобы не терять 0/false
+end
+-- Числовое значение с гарантированным фолбэком — если с ноды пришло не
+-- число (nil, отсутствующий параметр, рассинхрон версий) — берём дефолт,
+-- а если и дефолта нет — 0. Никогда не возвращает nil, чтобы арифметика
+-- ниже не падала.
+local function num(v, default)
+    if type(v) == "number" then return v end
+    if type(default) == "number" then return default end
+    return 0
 end
 local function icon(name)
     local p = DIR .. "icons/" .. name .. ".png"
@@ -136,9 +146,12 @@ for si, sec in ipairs(DATA.SECTIONS) do
                         ui:HGroup{ Weight = 0, tunpack(icons) },
                     })
                 elseif ctrl.kind == "slider" then
-                    local span = ctrl.hi - ctrl.lo
-                    local v = readVal(ctrl.id) or ctrl.default
-                    local sliderVal = math.floor(((v - ctrl.lo) / span) * 1000 + 0.5)
+                    local lo = num(ctrl.lo, 0)
+                    local hi = num(ctrl.hi, 1)
+                    if hi <= lo then hi = lo + 1 end
+                    local span = hi - lo
+                    local v = num(readVal(ctrl.id), num(ctrl.default, lo))
+                    local sliderVal = math.floor(((v - lo) / span) * 1000 + 0.5)
                     table.insert(rows, ui:HGroup{
                         Weight = 0,
                         ui:Label{ Text = ctrl.name, MinimumSize = { 190, 0 } },
@@ -146,14 +159,14 @@ for si, sec in ipairs(DATA.SECTIONS) do
                         ui:Label{ ID = labelID, Text = string.format("%.3f", v), MinimumSize = { 55, 0 } },
                     })
                 elseif ctrl.kind == "check" then
-                    local v = readVal(ctrl.id) or ctrl.default
+                    local v = readVal(ctrl.id)
+                    if v == nil then v = ctrl.default end
                     table.insert(rows, ui:HGroup{
                         Weight = 0,
                         ui:Label{ Text = ctrl.name, MinimumSize = { 190, 0 } },
                         ui:CheckBox{ ID = widgetID, Checked = (v == 1 or v == true) },
                     })
                 elseif ctrl.kind == "combo" then
-                    local v = readVal(ctrl.id) or ctrl.default
                     local combo = ui:ComboBox{ ID = widgetID, MinimumSize = { 200, 0 } }
                     table.insert(rows, ui:HGroup{
                         Weight = 0,
@@ -260,14 +273,16 @@ end
 local function refreshAllWidgets()
     for id, w in pairs(widgetIndex) do
         local v = readVal(id)
-        if v ~= nil then
+        if type(v) == "number" and itm[w.widgetID] then
             if w.ctrl.kind == "slider" then
-                local span = w.ctrl.hi - w.ctrl.lo
-                itm[w.widgetID].Value = math.floor(((v - w.ctrl.lo) / span) * 1000 + 0.5)
+                local lo = num(w.ctrl.lo, 0)
+                local hi = num(w.ctrl.hi, 1)
+                if hi <= lo then hi = lo + 1 end
+                itm[w.widgetID].Value = math.floor(((v - lo) / (hi - lo)) * 1000 + 0.5)
                 itm[w.labelID].Text = string.format("%.3f", v)
             elseif w.ctrl.kind == "check" then
-                itm[w.widgetID].Checked = (v == 1 or v == true)
-            elseif w.ctrl.kind == "combo" and itm[w.widgetID] then
+                itm[w.widgetID].Checked = (v == 1)
+            elseif w.ctrl.kind == "combo" then
                 itm[w.widgetID].CurrentIndex = math.floor(v + 0.5)
             end
         end
@@ -277,10 +292,12 @@ end
 for id, w in pairs(widgetIndex) do
     local ctrl = w.ctrl
     if ctrl.kind == "slider" then
+        local lo = num(ctrl.lo, 0)
+        local hi = num(ctrl.hi, 1)
+        if hi <= lo then hi = lo + 1 end
         win.On[w.widgetID].ValueChanged = function(ev)
             local raw = itm[w.widgetID].Value
-            local span = ctrl.hi - ctrl.lo
-            local v = ctrl.lo + (raw / 1000) * span
+            local v = lo + (raw / 1000) * (hi - lo)
             itm[w.labelID].Text = string.format("%.3f", v)
             setValue(id, v)
         end
