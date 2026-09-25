@@ -118,7 +118,6 @@ local presetRow = ui:HGroup{ ID = "presetRow", tunpack(presetIconRow) }
 -- 2b. Секции с параметрами (кроме «Пресеты» — та уже сверху иконками)
 ----------------------------------------------------------------------------
 
-local sectionBlocks = {}
 local allSectionRows = {}
 local widgetIndex = {}   -- id -> {widgetID=..., labelID=..., ctrl=...}
 
@@ -200,15 +199,16 @@ for si, sec in ipairs(DATA.SECTIONS) do
             end
         end
 
+        -- v6: сворачивание разделов убрал — переключение .Hidden на уже
+        -- созданном виджете по клику ненадёжно в этом UI (заголовок менял
+        -- стрелку, а тело не показывалось/не скрывалось). Разделы теперь
+        -- всегда видны — надёжнее, чем чинить капризное поведение виджета.
+        -- Окно можно растянуть за угол — заголовок панели уже это подсказывает.
         local bodyID = "body_" .. si
-        local headerID = "hdr_" .. si
-        local expanded = sec.open
-        local body = ui:VGroup{ ID = bodyID, Hidden = not expanded, tunpack(rows) }
-        local header = ui:Button{ ID = headerID, Flat = true, Weight = 0,
-            Text = (expanded and "▼ " or "▶ ") .. sec.title .. "  (" .. #sec.controls .. ")" }
+        local body = ui:VGroup{ ID = bodyID, tunpack(rows) }
+        local header = ui:Label{ Text = "— " .. sec.title .. "  (" .. #sec.controls .. ") —",
+            Weight = 0, Alignment = { AlignHCenter = true } }
 
-        table.insert(sectionBlocks, { headerID = headerID, bodyID = bodyID, expanded = expanded,
-            title = sec.title, count = #sec.controls })
         table.insert(allSectionRows, header)
         table.insert(allSectionRows, body)
     end
@@ -216,20 +216,30 @@ end
 
 local rowsGroup = ui:VGroup{ ID = "rowsGroup", tunpack(allSectionRows) }
 
+-- Пробуем обернуть длинный список в прокрутку — ~100 строк не влезут на
+-- экран без неё. Если такого виджета в этой версии API нет — тихо
+-- откатываемся на список без скролла (работает, просто нужно тянуть окно
+-- руками, как раньше).
+local okScroll, scrollWrapped = pcall(function()
+    return ui:ScrollArea{ ID = "scrollArea", Weight = 1, rowsGroup }
+end)
+local middleContent = (okScroll and scrollWrapped) and scrollWrapped or rowsGroup
+if not okScroll then
+    print("[CRT Pro Panel] ScrollArea недоступна в этом API, список без прокрутки — тяни окно за угол.")
+end
+
 local win = disp:AddWindow({
     ID = "CRTProPanelWin",
     WindowTitle = "CRT Pro — " .. crtTool.Name,
-    Geometry = { 80, 80, 500, 820 },
+    Geometry = { 80, 80, 520, 900 },
     Spacing = 4,
 
     ui:VGroup{
         ui:Label{ Text = "Пресеты", Weight = 0 },
         presetRow,
         ui:TextEdit{ ID = "log", ReadOnly = true, MaximumSize = { 2000, 36 }, Text = "" },
-        rowsGroup,
+        middleContent,
         ui:HGroup{ Weight = 0,
-            ui:Button{ ID = "ExpandAllBtn", Text = "Развернуть всё" },
-            ui:Button{ ID = "CollapseAllBtn", Text = "Свернуть всё" },
             ui:Button{ ID = "RefreshBtn", Text = "Обновить из ноды" },
             ui:Button{ ID = "CloseBtn", Text = "Закрыть" },
         },
@@ -256,22 +266,6 @@ for _, sec in ipairs(DATA.SECTIONS) do
         end
     end
 end
-
-----------------------------------------------------------------------------
--- 3. Сворачивание разделов
-----------------------------------------------------------------------------
-
-local function setSectionExpanded(block, expanded)
-    block.expanded = expanded
-    itm[block.bodyID].Hidden = not expanded
-    itm[block.headerID].Text = (expanded and "▼ " or "▶ ") .. block.title .. "  (" .. block.count .. ")"
-end
-for _, block in ipairs(sectionBlocks) do
-    local b = block
-    win.On[block.headerID].Clicked = function(ev) setSectionExpanded(b, not b.expanded) end
-end
-function win.On.ExpandAllBtn.Clicked(ev) for _, b in ipairs(sectionBlocks) do setSectionExpanded(b, true) end end
-function win.On.CollapseAllBtn.Clicked(ev) for _, b in ipairs(sectionBlocks) do setSectionExpanded(b, false) end end
 
 ----------------------------------------------------------------------------
 -- 4. Двусторонняя связь: окно -> нода
