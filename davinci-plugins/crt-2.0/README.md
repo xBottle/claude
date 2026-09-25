@@ -1,4 +1,4 @@
-# CRT Pro Panel (v6): плавающее окно для CRT Pro
+# CRT 2.0 (v6): плавающее окно для CRT Pro
 
 Отдельное окно поверх Resolve, которое управляет нодой `CRTPro`. Работает
 как второй Инспектор: все изменения идут прямо в ноду, Cmd+Z их отменяет.
@@ -16,18 +16,18 @@
 
 ## Установка
 
-Скопируй **всю папку** `crt-pro-panel` в
+Скопируй **всю папку** `crt-2.0` в
 ```
 ~/Library/Application Support/Blackmagic Design/DaVinci Resolve/Fusion/Scripts/Comp/
 ```
 Выдели ноду `CRTPro` на странице Fusion, затем
-`Рабочая область → Сценарии → Comp → CRT Pro Panel`.
+`Рабочая область → Сценарии → Comp → CRT 2.0`.
 
 ## Файлы
 
 | Файл | Зачем |
 |---|---|
-| `CRT Pro Panel.lua` | сама панель |
+| `CRT 2.0.lua` | сама панель |
 | `crt_pro_data.lua` | разделы, пресеты и диапазоны, сгенерированы из `build_crt_pro.py` |
 | `icons/*.png` | иконки пресетов (и узоров, пока не подключены) |
 | `gen_data.py` | перегенерирует `crt_pro_data.lua`: `python3 gen_data.py build_crt_pro.py` |

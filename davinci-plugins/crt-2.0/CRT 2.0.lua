@@ -142,7 +142,7 @@ local function buildControlRow(ctrl, widgetID, labelID)
                         Weight = 0,
                         ui:Label{ Text = ctrl.name, MinimumSize = { 190, 0 } },
                         ui:Slider{ ID = widgetID, Min = 0, Max = 1000, Value = sliderVal, MinimumSize = { 140, 0 } },
-                        ui:Label{ ID = labelID, Text = string.format("%.3f", v), MinimumSize = { 55, 0 } },
+                        ui:LineEdit{ ID = labelID, Text = string.format("%.3f", v), MinimumSize = { 70, 0 }, MaximumSize = { 80, 30 } },
                     })
                 elseif ctrl.kind == "check" then
                     local v = readVal(ctrl.id)
@@ -171,7 +171,7 @@ local function buildControlRow(ctrl, widgetID, labelID)
                             Weight = 0,
                             ui:Label{ Text = ctrl.name .. ": " .. ch, MinimumSize = { 190, 0 } },
                             ui:Slider{ ID = subID, Min = 0, Max = 1000, Value = math.floor((v / 2) * 1000 + 0.5), MinimumSize = { 140, 0 } },
-                            ui:Label{ ID = subLbl, Text = string.format("%.3f", v), MinimumSize = { 55, 0 } },
+                            ui:LineEdit{ ID = subLbl, Text = string.format("%.3f", v), MinimumSize = { 70, 0 }, MaximumSize = { 80, 30 } },
                         })
                     end
     end
@@ -230,7 +230,7 @@ end
 
 local win = disp:AddWindow({
     ID = "CRTProPanelWin",
-    WindowTitle = "CRT Pro — " .. crtTool.Name,
+    WindowTitle = "CRT 2.0 — " .. crtTool.Name,
     Geometry = { 80, 80, 520, 900 },
     Spacing = 4,
 
@@ -302,11 +302,29 @@ for id, w in pairs(widgetIndex) do
         local lo = num(ctrl.lo, 0)
         local hi = num(ctrl.hi, 1)
         if hi <= lo then hi = lo + 1 end
+        local busy = false
         win.On[w.widgetID].ValueChanged = function(ev)
+            if busy then return end
             local raw = itm[w.widgetID].Value
             local v = lo + (raw / 1000) * (hi - lo)
+            if ctrl.integer then v = math.floor(v + 0.5) end
             itm[w.labelID].Text = string.format("%.3f", v)
             setValue(id, v)
+        end
+        -- Точный ввод числом, как в Инспекторе: можно выйти за шкалу ползунка
+        -- в пределах допустимого (amin..amax).
+        win.On[w.labelID].EditingFinished = function(ev)
+            local v = tonumber((tostring(itm[w.labelID].Text):gsub(",", ".")))
+            if not v then return end
+            if type(ctrl.amin) == "number" and v < ctrl.amin then v = ctrl.amin end
+            if type(ctrl.amax) == "number" and v > ctrl.amax then v = ctrl.amax end
+            if ctrl.integer then v = math.floor(v + 0.5) end
+            setValue(id, v)
+            itm[w.labelID].Text = string.format("%.3f", v)
+            busy = true
+            local t = (v - lo) / (hi - lo)
+            itm[w.widgetID].Value = math.floor(math.max(0, math.min(1, t)) * 1000 + 0.5)
+            busy = false
         end
     elseif ctrl.kind == "check" then
         win.On[w.widgetID].Clicked = function(ev)
