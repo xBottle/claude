@@ -73,11 +73,15 @@ table.sort(ordered, function(a, b) return a.key < b.key end)
 local SKIP_IDS = { Blend = true }
 
 local sections = {}          -- { {title=..., controls={...}}, ... } по порядку
-local fallback = { title = "Общие", controls = {} }
+local fallback = { title = "Общие (до первого раздела)", controls = {} }
 local currentSection = nil
-local remainingInSection = 0
 local skippedButtons, skippedCombos = 0, 0
 
+-- Важно: LBLC_NumInputs (сколько входов относится к разделу) при чтении
+-- через GetAttrs() после создания ноды не возвращается — это поле только
+-- для момента сборки .setting. Поэтому границу раздела определяем проще
+-- и надёжнее: "всё, что идёт после этого заголовка и до следующего —
+-- относится к текущему разделу", без подсчёта штук.
 for _, entry in ipairs(ordered) do
     local input = entry.input
     local ok, attrs = pcall(function() return input:GetAttrs() end)
@@ -88,17 +92,13 @@ for _, entry in ipairs(ordered) do
         local dataType = attrs.INPS_DataType or ""
 
         if inputControl == "LabelControl" then
-            -- Заголовок раздела. LBLC_NumInputs говорит, сколько СЛЕДУЮЩИХ
-            -- входов принадлежат этому разделу.
             local newSection = { title = name, controls = {} }
             table.insert(sections, newSection)
             currentSection = newSection
-            remainingInSection = tonumber(attrs.LBLC_NumInputs) or 0
 
         elseif inputControl == "ButtonControl" then
             -- Кнопки (Применить пресет, Сохранить и т.п.) — не параметр, пропускаем.
             skippedButtons = skippedButtons + 1
-            if currentSection and remainingInSection > 0 then remainingInSection = remainingInSection - 1 end
 
         elseif not SKIP_IDS[id] then
             local kind = nil
@@ -122,19 +122,15 @@ for _, entry in ipairs(ordered) do
                 if not lo or not hi or lo >= hi then lo, hi = 0, 1 end
 
                 local ctrl = { id = id, name = name, kind = kind, value = cur, min = lo, max = hi }
-                local target = (currentSection and remainingInSection > 0) and currentSection.controls or fallback.controls
+                local target = currentSection and currentSection.controls or fallback.controls
                 table.insert(target, ctrl)
-            end
-
-            if currentSection and remainingInSection > 0 then
-                remainingInSection = remainingInSection - 1
             end
         end
     end
 end
 
 if #fallback.controls > 0 then
-    table.insert(sections, fallback)
+    table.insert(sections, 1, fallback)
 end
 
 -- Разные контролы с одинаковым именем ("Включить" в каждом разделе) —
