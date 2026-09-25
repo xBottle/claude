@@ -164,7 +164,7 @@ if not code or not code:find("GlowGain=3.3") then bad("код настроек �
 press("BtnReset"); press("BtnPaste", { Code = code })
 if store.GlowGain ~= 3.3 or store.PixSize ~= 2 then bad("вставка кода не восстановила настройки") end
 local FU = os.getenv("HOME") .. "/Library/Application Support/Blackmagic Design/DaVinci Resolve/Fusion/"
-local pdir, template = FU .. "CRT Pro User Presets/", FU .. "Templates/Edit/Effects/Claude/CRT/CRT Pro 2.0.setting"
+local pdir, template = FU .. "CRT Pro User Presets/", FU .. "Templates/Edit/Effects/Claude/CRT/CRT Pro v2.setting"
 press("BtnSave", { Name = "Тест/1" }, nil)
 if not bmd.fileexists(pdir .. "Тест_1.crtpreset") then bad("свой пресет не сохранился") end
 local names, applyCode = comboOf(template)

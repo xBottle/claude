@@ -310,7 +310,7 @@ local function fusionDir()  -- macOS, Windows или Linux
 end
 local FU = fusionDir()
 local PRESET_DIR = FU .. "CRT Pro User Presets/"
-local TEMPLATE = FU .. "Templates/Edit/Effects/Claude/CRT/CRT Pro 2.0.setting"
+local TEMPLATE = FU .. "Templates/Edit/Effects/Claude/CRT/CRT Pro v2.setting"
 local NAMES = __NAMES__
 local C = tool.Composition or comp
 local function say(title, text)
@@ -420,11 +420,11 @@ say("CRT Pro", "Пресет «" .. name .. "» удалён.")
 ''',
     "window": r'''
 local script = FU .. "Scripts/Comp/crt-2.0/CRT Presets.lua"
-if not bmd.fileexists(script) then say("CRT Pro 2.0", "Не найдено окно пресетов:\n" .. script) return end
+if not bmd.fileexists(script) then say("CRT Pro v2", "Не найдено окно пресетов:\n" .. script) return end
 _G.CRT_TOOL = tool
 local ok, err = pcall(dofile, script)
 _G.CRT_TOOL = nil
-if not ok then say("CRT Pro 2.0", "Ошибка окна пресетов: " .. tostring(err)) end
+if not ok then say("CRT Pro v2", "Ошибка окна пресетов: " .. tostring(err)) end
 ''',
     "copy": r'''
 local parts = {}
@@ -496,7 +496,7 @@ def make_drfx(path, pro_dir):
     try:
         inner = os.path.join(tmp, "Edit", "Effects", "Claude", "CRT")
         os.makedirs(inner)
-        for src, name in ((pro_dir, "CRT Pro 2.0"),):
+        for src, name in ((pro_dir, "CRT Pro v2"),):
             for ext in (".setting", ".png"):
                 f = os.path.join(src, name + ext)
                 if os.path.exists(f):
@@ -1116,8 +1116,8 @@ def main():
             global SHARE_MODE
             SHARE_MODE = True
         out_dir = tempfile.mkdtemp(prefix="crt-pack-")
-    setting = os.path.join(out_dir, "CRT Pro 2.0.setting")
-    write_effect(out_dir, "CRT Pro 2.0", build_setting(0), ("2.0", "0x9933ff"))
+    setting = os.path.join(out_dir, "CRT Pro v2.setting")
+    write_effect(out_dir, "CRT Pro v2", build_setting(0), ("2.0", "0x9933ff"))
     print(f"собрано: CRT Pro.setting (своих пресетов в списке: {len(own_presets())})")
     if not check(setting):
         print("ОСТАНОВКА: проверка нашла проблемы, в Resolve ничего не установлено")
@@ -1138,8 +1138,8 @@ def main():
         return
     os.makedirs(LIB, exist_ok=True)
     for ext in (".setting", ".png"):
-        shutil.copy2(os.path.join(HERE, "CRT Pro 2.0" + ext), os.path.join(LIB, "CRT Pro 2.0" + ext))
-        old = os.path.join(os.path.dirname(LIB), "CRT Pro 2.0" + ext)  # старое место: прямо в Claude/
+        shutil.copy2(os.path.join(HERE, "CRT Pro v2" + ext), os.path.join(LIB, "CRT Pro v2" + ext))
+        old = os.path.join(os.path.dirname(LIB), "CRT Pro v2" + ext)  # старое место: прямо в Claude/
         if os.path.exists(old):
             os.remove(old)
     print(f"установлено: {LIB}")
