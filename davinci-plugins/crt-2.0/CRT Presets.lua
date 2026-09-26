@@ -145,7 +145,7 @@ local ui = FUAPP.UIManager
 -- Переключатель: если окно уже открыто — эта кнопка его закрывает.
 local function getD(k) local ok, v = pcall(function() return FUAPP:GetData(k) end); return ok and v or nil end
 local function setD(k, v) pcall(function() FUAPP:SetData(k, v) end) end
-local MARK_DIR = (os.getenv("TMPDIR") or "/tmp/") .. "/"
+local MARK_DIR = (os.getenv("TMPDIR") or os.getenv("TEMP") or "/tmp") .. "/"
 local OPEN_MARK, CLOSE_MARK = MARK_DIR .. "crtpro_presets.open", MARK_DIR .. "crtpro_presets.close"
 local function exists(f) local h = io.open(f, "r"); if h then h:close() return true end return false end
 local function touch(f) local h = io.open(f, "w"); if h then h:write(tostring(os.time())); h:close() end end
@@ -162,7 +162,9 @@ local function icon(name)
 end
 
 pcall(syncTemplate)
-local selected = nil     -- { kind = "builtin"/"own", index = i, name = "..." }
+local selected = nil
+local page = 1
+local PER_PAGE = 15     -- { kind = "builtin"/"own", index = i, name = "..." }
 local statusText = ""
 local reopen = true
 local geom = { 200, 60, 640, 820 }
@@ -198,9 +200,12 @@ QPushButton:hover { border:1px solid #6d5dfc; background:#1b1c24; }]]
         end
         return icon(it.ico) or icon("preset_0")
     end
-    for r = 1, #items, COLS do
+    local pages = math.max(1, math.ceil(#items / PER_PAGE))
+    if page > pages then page = pages end
+    local first, last = (page - 1) * PER_PAGE + 1, math.min(page * PER_PAGE, #items)
+    for r = first, last, COLS do
         local cells = {}
-        for c = r, math.min(r + COLS - 1, #items) do
+        for c = r, math.min(r + COLS - 1, last) do
             local it = items[c]
             local isSel = selected and selected.name == it.name and selected.kind == it.kind
             cells[#cells + 1] = ui:VGroup{
@@ -252,6 +257,12 @@ QLineEdit:focus { border:1px solid #8b7bff; }]],
             Spacing = 8,
             ui:Label{ Text = "<img src='" .. DIR .. "icons/title.png'>", Alignment = { AlignHCenter = true }, Weight = 0 },
             ui:VGroup{ Weight = 0, Spacing = 6, tunpack(rows) },
+            ui:HGroup{ Weight = 0,
+                ui:Button{ ID = "PgPrev", Text = "◀", MaximumSize = { 60, 34 }, StyleSheet = btnStyle(WHITE) },
+                ui:Label{ Text = string.format("%d / %d   ·   %d пресетов", page, pages, #items),
+                    Alignment = { AlignHCenter = true, AlignVCenter = true }, StyleSheet = "color:#8a8c99;" },
+                ui:Button{ ID = "PgNext", Text = "▶", MaximumSize = { 60, 34 }, StyleSheet = btnStyle(WHITE) },
+            },
             ui:Label{ ID = "PatLabel", Weight = 0, StyleSheet = "color:#22d3ee; font-weight:600; letter-spacing:1px; margin-top:8px;",
                 Text = "УЗОР ПИКСЕЛЕЙ" .. ((PAT_NAMES[curPat + 1] and ("  ·  " .. PAT_NAMES[curPat + 1])) or "") },
             ui:VGroup{ Weight = 0, Spacing = 6, tunpack(patRows) },
@@ -300,9 +311,12 @@ QLineEdit:focus { border:1px solid #8b7bff; }]],
     end
 
     -- клик по карточке: выбрать и сразу применить
-    for c, it in ipairs(items) do
+    function win.On.PgPrev.Clicked() if page > 1 then page = page - 1; restart() end end
+    function win.On.PgNext.Clicked() if page < pages then page = page + 1; restart() end end
+    for c = first, last do
+        local it = items[c]
         win.On["card_" .. c].Clicked = function()
-            for c2 = 1, #items do pcall(function() itm["card_" .. c2].StyleSheet = (c2 == c) and CARD_SEL or CARD end) end
+            for c2 = first, last do pcall(function() itm["card_" .. c2].StyleSheet = (c2 == c) and CARD_SEL or CARD end) end
             selected = it
             itm.NameEdit.Text = it.name
             apply(it)
@@ -323,7 +337,7 @@ QLineEdit:focus { border:1px solid #8b7bff; }]],
         applyTable(builtinValues(0), "сброс")
         pcall(function() tool:SetInput("PresetSel", 0) end)
         selected = nil
-        for c2 = 1, #items do pcall(function() itm["card_" .. c2].StyleSheet = CARD end) end
+        for c2 = first, last do pcall(function() itm["card_" .. c2].StyleSheet = CARD end) end
         status("Все настройки сброшены к значениям по умолчанию.")
     end
 

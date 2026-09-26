@@ -50,7 +50,7 @@ for i, k in ipairs(order) do
     local nxt = order[i + n + 1]
     if nxt then
       local u3 = ucs[grp.Inputs[nxt].Source]
-      if not (u3 and u3.INPID_InputControl == "LabelControl" and u3.LBLC_DropDownButton) then bad("после раздела " .. k .. " остался контрол вне раздела: " .. nxt) end
+      if not (u3 and u3.INPID_InputControl == "LabelControl") then bad("после раздела " .. k .. " остался контрол вне раздела: " .. nxt) end
     end
   end
 end

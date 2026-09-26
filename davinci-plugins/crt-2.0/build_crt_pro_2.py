@@ -87,11 +87,12 @@ def note(cid, txt):
 PRESET_NAMES = [
     "По умолчанию (как в уроке)", "Классический ТВ", "Аркадный автомат", "Зелёный терминал",
     "Янтарный монитор", "VHS-мечта", "Сломанный телевизор", "Снято на камеру", "Мягкий ретро", "Киберпанк",
+    "Неоновый клуб", "Y2K камкордер", "8-бит аркада", "Хоум-видео", "Холодный монитор", "Глитч-клип",
+    "Мягкий LCD", "Тёплый винтаж",
 ]
 
 SECTIONS = [
     ("SecPresets", "Пресеты", True, [
-        note("NotePresets", 'Клик по карточке в окне пресетов сразу применяет пресет. Свои пресеты (★) сохраняются вместе с превью кадра.'),
         button("BtnWindow", "▣  ОКНО ПРЕСЕТОВ", "window"),
         combo("PresetSel", "Пресет", PRESET_NAMES, 0),
         button("BtnApply", "Применить пресет", "apply"),
@@ -103,7 +104,6 @@ SECTIONS = [
         button("BtnPaste", "Вставить код", "paste", 0.5),
     ]),
     ("SecPixels", "Пиксели", True, [
-        note("NotePixels", 'Сетка «пикселей» кинескопа поверх картинки. Узор — форма ячейки. Размер пикселя — крупность сетки. «Понижать разрешение» делает картинку по-настоящему пиксельной. Гамма и усиление яркости компенсируют затемнение от маски.'),
         check("PixOn", "Пиксельная маска", 1),
         combo("PixPattern", "Узор", ["Прямые", "Со сдвигом", "Апертурная решётка (Trinitron)", "Щелевая маска",
                                      "Теневая маска (триады)", "LCD-сетка", "LED-стена", "Точечная матрица",
@@ -120,7 +120,6 @@ SECTIONS = [
         slider("PixGamma", "Гамма пикселей", 0.635, 0.2, 2, 0.01, 10),
     ]),
     ("SecScan", "Строки развёртки", False, [
-        note("NoteScan", 'Тёмные горизонтальные полосы между строками луча. «Толщина луча» — какая часть строки светится, «Мягкость» — насколько размыт край.'),
         check("ScanOn", "Включить", 0),
         slider("ScanStrength", "Сила", 0.4, 0, 1, 0, 1),
         check("ScanLink", "Шаг = размер пикселя", 1),
@@ -129,7 +128,6 @@ SECTIONS = [
         slider("ScanSoft", "Мягкость строк", 0.5, 0, 3, 0, 20),
     ]),
     ("SecConv", "Сведение лучей (RGB)", False, [
-        note("NoteConv", 'Красный и синий лучи чуть промахиваются мимо зелёного — цветная кайма на контурах, как у старого ТВ. Значения в пикселях.'),
         check("ConvOn", "Включить", 0),
         slider("ConvRX", "Красный по X (px)", 1.5, -10, 10, -1000, 1000),
         slider("ConvRY", "Красный по Y (px)", 0, -10, 10, -1000, 1000),
@@ -137,25 +135,21 @@ SECTIONS = [
         slider("ConvBY", "Синий по Y (px)", 0, -10, 10, -1000, 1000),
     ]),
     ("SecBleed", "Растекание цвета", False, [
-        note("NoteBleed", 'Цвет «растекается» вправо по строке, как у аналогового сигнала. Влияет только на цвет, резкость яркости остаётся.'),
         check("BleedOn", "Включить", 0),
         slider("BleedStrength", "Сила", 0.7, 0, 1, 0, 1),
         slider("BleedBlur", "Размытие (px)", 8, 0, 40, 0, 500),
         slider("BleedShift", "Сдвиг вправо (px)", 2, -20, 20, -500, 500),
     ]),
     ("SecShift", "Сдвиг цвета", False, [
-        note("NoteShift", 'Поворот оттенка и насыщенность картинки до кинескопа.'),
         check("ShiftOn", "Включить", 0),
         slider("HueShift", "Оттенок", 0, -180, 180, -1000, 1000),
         slider("SatShift", "Насыщенность", 1, 0, 2, 0, 10),
     ]),
     ("SecRes", "Цветовая глубина", False, [
-        note("NoteRes", 'Меньше уровней — заметнее ступеньки в градиентах, эффект старой видеокарты.'),
         check("ColorResOn", "Включить", 0),
         slider("ColorLevels", "Уровней на канал", 16, 2, 64, 2, 1024, integer=True),
     ]),
     ("SecMono", "Монохромный экран", False, [
-        note("NoteMono", 'Картинка в один цвет люминофора: зелёный терминал, янтарный монитор. Режим — как цвет смешивается с яркостью.'),
         check("MonoOn", "Включить", 0),
         slider("MonoAmount", "Сила", 1, 0, 1, 0, 1),
         combo("MonoMode", "Режим", ["Умножение", "Экран", "Наложение", "Затемнение основы"], 0),
@@ -163,7 +157,6 @@ SECTIONS = [
         slider("MonoBoost", "Яркость", 1.3, 0, 3, 0, 20),
     ]),
     ("SecIn", "Цвет на входе", False, [
-        note("NoteIn", 'Цвет исходника ДО эффекта: экспозиция, контраст, баланс каналов.'),
         slider("InGain", "Экспозиция", 1, 0, 4, 0, 100),
         slider("InLift", "Подъём теней", 0, -0.5, 0.5, -5, 5),
         slider("InGamma", "Гамма", 1, 0.2, 3, 0.01, 10),
@@ -174,21 +167,18 @@ SECTIONS = [
         slider("BalB", "Баланс: синий", 1, 0, 2, 0, 10),
     ]),
     ("SecGlow", "Свечение", False, [
-        note("NoteGlow", 'Яркие места светятся и расплываются. «Порог» — с какой яркости начинается свечение.'),
         check("GlowOn", "Включить", 1),
         slider("GlowThreshold", "Порог", 0.1, 0, 1, 0, 1),
         slider("GlowGain", "Сила", 1.5, 0, 5, 0, 50),
         slider("GlowSize", "Размер", 8, 0, 60, 0, 500),
     ]),
     ("SecTube", "Свечение трубки", False, [
-        note("NoteTube", 'Мягкий общий ореол вокруг всего изображения, как от стекла трубки. «Оттенок» — цвет ореола.'),
         check("TubeOn", "Включить", 0),
         slider("TubeAmount", "Сила", 0.25, 0, 1, 0, 5),
         slider("TubeSize", "Размер", 60, 5, 300, 0, 2000),
         color("TubeColor", "Оттенок", (0.65, 0.8, 1.0)),
     ]),
     ("SecScreen", "Экран", False, [
-        note("NoteScreen", 'Форма экрана: выпуклость (бочка), затемнение к краям и скруглённые углы с чёрной рамкой.'),
         check("CurveOn", "Выпуклость экрана", 0),
         slider("CurveAmount", "Сила выпуклости", 0.15, -0.6, 0.6, -3, 3),
         check("VigOn", "Виньетка", 0),
@@ -201,7 +191,6 @@ SECTIONS = [
         slider("CornerSoft", "Мягкость рамки", 0.004, 0, 0.05, 0, 1),
     ]),
     ("SecFlick", "Мерцание", False, [
-        note("NoteFlick", 'Мигание яркости всего кадра. «Плавность» 0 — резкие скачки, 1 — медленное «дыхание». Каналы — какие цвета мерцают.'),
         check("FlickOn", "Включить", 0),
         combo("FlickType", "Тип", ["Яркость", "Гамма"], 0),
         slider("FlickAmount", "Сила", 0.08, 0, 1, 0, 1),
@@ -212,7 +201,6 @@ SECTIONS = [
         check("FlickB", "Синий", 1),
     ]),
     ("SecShake", "Тряска", False, [
-        note("NoteShake", 'Мелкая тряска кадра. «До пикселей» — трясётся картинка под сеткой, иначе вместе с сеткой. «Дёрганость» — доля резких рывков.'),
         check("ShakeOn", "Включить", 0),
         check("ShakeBefore", "До пикселей", 1),
         slider("ShakeX", "Амплитуда X", 0.002, 0, 0.03, 0, 1),
@@ -222,7 +210,6 @@ SECTIONS = [
         combo("ShakeEdges", "Края", ["Холст", "Повтор", "Дублирование", "Зеркало"], 3),
     ]),
     ("SecBand", "Затвор (бегущая полоса)", False, [
-        note("NoteBand", 'Светлая или тёмная полоса, бегущая по экрану (как при съёмке ТВ камерой).'),
         check("BandOn", "Включить", 0),
         slider("BandStrength", "Сила", 0.25, 0, 1, 0, 5),
         slider("BandGamma", "Гамма полосы", 0, -1, 1, -5, 5),
@@ -233,7 +220,6 @@ SECTIONS = [
         check("BandDark", "Тёмная полоса", 0),
     ]),
     ("SecNoise", "Плёночное зерно", False, [
-        note("NoteNoise", 'Живое зерно поверх изображения. «Мелкость» — размер зерна, «Скорость» — как часто меняется.'),
         check("NoiseOn", "Включить", 0),
         slider("NoiseAmount", "Сила", 0.12, 0, 1, 0, 1),
         slider("NoiseSize", "Мелкость зерна", 400, 10, 1000, 1, 10000),
@@ -241,7 +227,6 @@ SECTIONS = [
         slider("NoiseContrast", "Контраст зерна", 2, 0, 5, 0, 50),
     ]),
     ("SecOut", "Цвет на выходе", False, [
-        note("NoteOut", 'Цвет ПОСЛЕ эффекта: финальная яркость, контраст, насыщенность. «Обрезать 0–1» убирает пересветы.'),
         slider("OutGain", "Яркость", 1, 0, 4, 0, 100),
         slider("OutLift", "Подъём теней", 0, -0.5, 0.5, -5, 5),
         slider("OutGamma", "Гамма", 1, 0.2, 3, 0.01, 10),
@@ -250,7 +235,6 @@ SECTIONS = [
         check("OutClip", "Обрезать 0–1", 0),
     ]),
     ("SecPhos", "Кинескоп: послесвечение и блик", False, [
-        note("NotePhos", 'Новое. Послесвечение: яркие движущиеся объекты оставляют затухающий хвост (считает прошлый кадр — чуть медленнее). Блик: отражение на стекле, двигается ползунками X/Y.'),
         check("PersistOn", "Послесвечение (след от движения)", 0),
         slider("PersistAmount", "Длина следа", 0.6, 0, 0.95, 0, 0.99),
         check("GlareOn", "Блик на стекле", 0),
@@ -260,7 +244,6 @@ SECTIONS = [
         slider("GlareSize", "Размер блика", 0.35, 0.05, 1, 0.01, 3),
     ]),
     ("SecGlobal", "Общее", False, [
-        note("NoteGlobal", 'Интенсивность — смешивание с оригиналом (0 = эффект выключен). Замер скорости пишет время кадра в Консоль.'),
         slider("GlobalMix", "Интенсивность эффекта", 1, 0, 1, 0, 1),
         check("PerfOn", "Замер скорости (в консоль)", 0),
     ]),
@@ -279,6 +262,12 @@ PAGES = [
 _by_id = {sec[0]: sec for sec in SECTIONS}
 assert sorted(_by_id) == sorted(i for _, ids in PAGES for i in ids), "PAGES must cover all sections"
 PAGE_OF = {i: pg for pg, ids in PAGES for i in ids}
+TAB_NOTES = {
+    "Пиксели": "Вкладка «Пиксели» — сама сетка кинескопа: форма и размер пикселей, строки развёртки и сведение цветных лучей.",
+    "Экран": "Вкладка «Экран» — стекло и форма трубки: выпуклость, углы, виньетка, послесвечение, блик и свечение.",
+    "Цвет": "Вкладка «Цвет» — цвет до и после эффекта: грейд, оттенок, монохром, глубина цвета и растекание.",
+    "Помехи": "Вкладка «Помехи» — всё живое во времени: мерцание, бегущая полоса, зерно и тряска.",
+}
 SECTIONS[:] = [_by_id[i] for _, ids in PAGES for i in ids]
 
 
@@ -329,6 +318,26 @@ PRESETS = {
             GlowThreshold=0.05, ConvOn=1, ConvRX=1.5, ConvBX=-1.5, PixPattern=2, ScanOn=1, ScanStrength=0.3,
             ShiftOn=1, HueShift=-12, SatShift=1.2, TubeOn=1, TubeAmount=0.35, TubeColorRed=0.5,
             TubeColorGreen=0.6, TubeColorBlue=1.0),
+    10: dict(PixPattern=2, PixSize=1.5, GlowGain=3.5, GlowSize=20, GlowThreshold=0.05, InSat=1.5, BalR=1.1,
+             BalB=1.3, ScanOn=1, ScanStrength=0.3, ConvOn=1, ConvRX=2, ConvBX=-2, VigOn=1, VigAmount=0.4),
+    11: dict(PixStrength=0.5, PixPattern=5, NoiseOn=1, NoiseAmount=0.15, InSat=0.9, OutContrast=0.1, BleedOn=1,
+             BleedStrength=0.5, BleedShift=3, ShakeOn=1, ShakeX=0.001, ShakeY=0.001, ShakeJitter=0.2, GlowGain=1.5),
+    12: dict(PixSize=3, PixPattern=7, ColorResOn=1, ColorLevels=6, ScanOn=1, ScanStrength=0.5, GlowGain=2.5,
+             CurveOn=1, CurveAmount=0.1, CornerOn=1),
+    13: dict(PixStrength=0.45, PixSoft=0.6, NoiseOn=1, NoiseAmount=0.2, BandOn=1, BandStrength=0.2, BandSpeed=0.2,
+             InSat=0.8, OutGamma=1.1, FlickOn=1, FlickAmount=0.06, BleedOn=1, BleedStrength=0.6, VigOn=1,
+             VigAmount=0.5),
+    14: dict(BalR=0.85, BalB=1.3, PixPattern=3, ScanOn=1, ScanStrength=0.4, CurveOn=1, CurveAmount=0.15,
+             CornerOn=1, VigOn=1, VigAmount=0.5, GlareOn=1, GlareAmount=0.35, TubeOn=1, TubeAmount=0.3,
+             TubeColorRed=0.5, TubeColorGreen=0.7, TubeColorBlue=1.0),
+    15: dict(RGBMode=2, ConvOn=1, ConvRX=5, ConvBX=-4, ShakeOn=1, ShakeX=0.01, ShakeY=0.004, ShakeSpeed=4,
+             ShakeJitter=0.9, FlickOn=1, FlickAmount=0.25, FlickSmooth=0, BandOn=1, BandSpeed=2, BandStrength=0.5,
+             NoiseOn=1, NoiseAmount=0.2, InSat=1.4),
+    16: dict(PixPattern=5, PixStrength=0.5, PixSoft=0.4, GlowGain=1.2, OutContrast=-0.05, InSat=1.05),
+    17: dict(BalR=1.2, BalG=1.02, BalB=0.8, InSat=0.8, PixPattern=1, ScanOn=1, ScanStrength=0.3, CurveOn=1,
+             CurveAmount=0.12, CornerOn=1, VigOn=1, VigAmount=0.55, NoiseOn=1, NoiseAmount=0.1, GlareOn=1,
+             GlareAmount=0.25, PersistOn=1, PersistAmount=0.5, TubeOn=1, TubeAmount=0.25, TubeColorRed=1.0,
+             TubeColorGreen=0.75, TubeColorBlue=0.45),
 }
 
 for _p in PRESETS.values():
@@ -1040,7 +1049,17 @@ def build_ctrl_and_inputs(values):
     ctrl.user_controls = []
     group_inputs = ["MainInput1 = InstanceInput {\n\tSourceOp = \"InRouter\",\n\tSource = \"Input\",\n}"]
     cur_page = None
+
+    def flush_note(new_page):
+        """Перед сменой вкладки добавить строку-описание прошлой вкладки."""
+        if cur_page and cur_page in TAB_NOTES and cur_page != new_page:
+            nid = "Tab" + str(list(TAB_NOTES).index(cur_page)) + "Info"
+            ctrl.user_controls.append(uc_def(note(nid, TAB_NOTES[cur_page])).replace(
+                'ICS_ControlPage = "Controls"', "ICS_ControlPage = " + lstr(cur_page)))
+            group_inputs.append(f"{nid} = InstanceInput {{\n\tSourceOp = \"Ctrl\",\n\tSource = \"{nid}\",\n}}")
+
     for sid, sname, is_open, items in SECTIONS:
+        flush_note(PAGE_OF[sid])
         count = sum(3 if c.kind == "color" else 1 for c in items)
         lab = C(sid, "label", sname, is_open=is_open)
         lab.count = count
@@ -1077,6 +1096,8 @@ def build_ctrl_and_inputs(values):
                 ctrl.val(c.id, v)
                 extra = f"\n\tDefault = {lnum(v)},"
             group_inputs.append(f"{c.id} = InstanceInput {{\n\tSourceOp = \"Ctrl\",\n\tSource = \"{c.id}\",{extra}\n}}")
+    # описание вкладки — внизу каждой вкладки (кроме главной)
+    flush_note(None)
     ctrl.user_controls.append(
         'Fake = { LINKS_Name = "Имитация RGB", LINKID_DataType = "Number", '
         'INPID_InputControl = "SliderControl", INP_Integer = false, INP_Default = 0, '

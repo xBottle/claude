@@ -2,9 +2,8 @@
 return {
   SECTIONS = {
     { id = "SecPresets", title = "Пресеты", open = true, controls = {
-      { id = "NotePresets", kind = "note", name = "Клик по карточке в окне пресетов сразу применяет пресет. Свои пресеты (★) сохраняются вместе с превью кадра." },
       { id = "BtnWindow", kind = "button", name = "▣  ОКНО ПРЕСЕТОВ", action = "window" },
-      { id = "PresetSel", kind = "combo", name = "Пресет", default = 0, options = { "По умолчанию (как в уроке)", "Классический ТВ", "Аркадный автомат", "Зелёный терминал", "Янтарный монитор", "VHS-мечта", "Сломанный телевизор", "Снято на камеру", "Мягкий ретро", "Киберпанк" } },
+      { id = "PresetSel", kind = "combo", name = "Пресет", default = 0, options = { "По умолчанию (как в уроке)", "Классический ТВ", "Аркадный автомат", "Зелёный терминал", "Янтарный монитор", "VHS-мечта", "Сломанный телевизор", "Снято на камеру", "Мягкий ретро", "Киберпанк", "Неоновый клуб", "Y2K камкордер", "8-бит аркада", "Хоум-видео", "Холодный монитор", "Глитч-клип", "Мягкий LCD", "Тёплый винтаж" } },
       { id = "BtnApply", kind = "button", name = "Применить пресет", action = "apply" },
       { id = "BtnSave", kind = "button", name = "Сохранить мой пресет", action = "save" },
       { id = "BtnLoad", kind = "button", name = "Загрузить мой пресет", action = "load" },
@@ -14,12 +13,10 @@ return {
       { id = "BtnPaste", kind = "button", name = "Вставить код", action = "paste" },
     } },
     { id = "SecGlobal", title = "Общее", open = false, controls = {
-      { id = "NoteGlobal", kind = "note", name = "Интенсивность — смешивание с оригиналом (0 = эффект выключен). Замер скорости пишет время кадра в Консоль." },
       { id = "GlobalMix", kind = "slider", name = "Интенсивность эффекта", default = 1, lo = 0, hi = 1, amin = 0, amax = 1, integer = false },
       { id = "PerfOn", kind = "check", name = "Замер скорости (в консоль)", default = 0 },
     } },
     { id = "SecPixels", title = "Пиксели", open = true, controls = {
-      { id = "NotePixels", kind = "note", name = "Сетка «пикселей» кинескопа поверх картинки. Узор — форма ячейки. Размер пикселя — крупность сетки. «Понижать разрешение» делает картинку по-настоящему пиксельной. Гамма и усиление яркости компенсируют затемнение от маски." },
       { id = "PixOn", kind = "check", name = "Пиксельная маска", default = 1 },
       { id = "PixPattern", kind = "combo", name = "Узор", default = 0, options = { "Прямые", "Со сдвигом", "Апертурная решётка (Trinitron)", "Щелевая маска", "Теневая маска (триады)", "LCD-сетка", "LED-стена", "Точечная матрица", "Сетка без цвета", "Только строки" } },
       { id = "RGBMode", kind = "combo", name = "Режим RGB", default = 0, options = { "Настоящий RGB", "Имитация (без цвета)", "Разделение RGB" } },
@@ -34,7 +31,6 @@ return {
       { id = "PixGamma", kind = "slider", name = "Гамма пикселей", default = 0.635, lo = 0.2, hi = 2, amin = 0.01, amax = 10, integer = false },
     } },
     { id = "SecScan", title = "Строки развёртки", open = false, controls = {
-      { id = "NoteScan", kind = "note", name = "Тёмные горизонтальные полосы между строками луча. «Толщина луча» — какая часть строки светится, «Мягкость» — насколько размыт край." },
       { id = "ScanOn", kind = "check", name = "Включить", default = 0 },
       { id = "ScanStrength", kind = "slider", name = "Сила", default = 0.4, lo = 0, hi = 1, amin = 0, amax = 1, integer = false },
       { id = "ScanLink", kind = "check", name = "Шаг = размер пикселя", default = 1 },
@@ -43,7 +39,6 @@ return {
       { id = "ScanSoft", kind = "slider", name = "Мягкость строк", default = 0.5, lo = 0, hi = 3, amin = 0, amax = 20, integer = false },
     } },
     { id = "SecConv", title = "Сведение лучей (RGB)", open = false, controls = {
-      { id = "NoteConv", kind = "note", name = "Красный и синий лучи чуть промахиваются мимо зелёного — цветная кайма на контурах, как у старого ТВ. Значения в пикселях." },
       { id = "ConvOn", kind = "check", name = "Включить", default = 0 },
       { id = "ConvRX", kind = "slider", name = "Красный по X (px)", default = 1.5, lo = -10, hi = 10, amin = -1000, amax = 1000, integer = false },
       { id = "ConvRY", kind = "slider", name = "Красный по Y (px)", default = 0, lo = -10, hi = 10, amin = -1000, amax = 1000, integer = false },
@@ -51,7 +46,6 @@ return {
       { id = "ConvBY", kind = "slider", name = "Синий по Y (px)", default = 0, lo = -10, hi = 10, amin = -1000, amax = 1000, integer = false },
     } },
     { id = "SecScreen", title = "Экран", open = false, controls = {
-      { id = "NoteScreen", kind = "note", name = "Форма экрана: выпуклость (бочка), затемнение к краям и скруглённые углы с чёрной рамкой." },
       { id = "CurveOn", kind = "check", name = "Выпуклость экрана", default = 0 },
       { id = "CurveAmount", kind = "slider", name = "Сила выпуклости", default = 0.15, lo = -0.6, hi = 0.6, amin = -3, amax = 3, integer = false },
       { id = "VigOn", kind = "check", name = "Виньетка", default = 0 },
@@ -64,7 +58,6 @@ return {
       { id = "CornerSoft", kind = "slider", name = "Мягкость рамки", default = 0.004, lo = 0, hi = 0.05, amin = 0, amax = 1, integer = false },
     } },
     { id = "SecPhos", title = "Кинескоп: послесвечение и блик", open = false, controls = {
-      { id = "NotePhos", kind = "note", name = "Новое. Послесвечение: яркие движущиеся объекты оставляют затухающий хвост (считает прошлый кадр — чуть медленнее). Блик: отражение на стекле, двигается ползунками X/Y." },
       { id = "PersistOn", kind = "check", name = "Послесвечение (след от движения)", default = 0 },
       { id = "PersistAmount", kind = "slider", name = "Длина следа", default = 0.6, lo = 0, hi = 0.95, amin = 0, amax = 0.99, integer = false },
       { id = "GlareOn", kind = "check", name = "Блик на стекле", default = 0 },
@@ -74,21 +67,18 @@ return {
       { id = "GlareSize", kind = "slider", name = "Размер блика", default = 0.35, lo = 0.05, hi = 1, amin = 0.01, amax = 3, integer = false },
     } },
     { id = "SecGlow", title = "Свечение", open = false, controls = {
-      { id = "NoteGlow", kind = "note", name = "Яркие места светятся и расплываются. «Порог» — с какой яркости начинается свечение." },
       { id = "GlowOn", kind = "check", name = "Включить", default = 1 },
       { id = "GlowThreshold", kind = "slider", name = "Порог", default = 0.1, lo = 0, hi = 1, amin = 0, amax = 1, integer = false },
       { id = "GlowGain", kind = "slider", name = "Сила", default = 1.5, lo = 0, hi = 5, amin = 0, amax = 50, integer = false },
       { id = "GlowSize", kind = "slider", name = "Размер", default = 8, lo = 0, hi = 60, amin = 0, amax = 500, integer = false },
     } },
     { id = "SecTube", title = "Свечение трубки", open = false, controls = {
-      { id = "NoteTube", kind = "note", name = "Мягкий общий ореол вокруг всего изображения, как от стекла трубки. «Оттенок» — цвет ореола." },
       { id = "TubeOn", kind = "check", name = "Включить", default = 0 },
       { id = "TubeAmount", kind = "slider", name = "Сила", default = 0.25, lo = 0, hi = 1, amin = 0, amax = 5, integer = false },
       { id = "TubeSize", kind = "slider", name = "Размер", default = 60, lo = 5, hi = 300, amin = 0, amax = 2000, integer = false },
       { id = "TubeColor", kind = "color", name = "Оттенок", rgb = { 0.65, 0.8, 1.0 } },
     } },
     { id = "SecIn", title = "Цвет на входе", open = false, controls = {
-      { id = "NoteIn", kind = "note", name = "Цвет исходника ДО эффекта: экспозиция, контраст, баланс каналов." },
       { id = "InGain", kind = "slider", name = "Экспозиция", default = 1, lo = 0, hi = 4, amin = 0, amax = 100, integer = false },
       { id = "InLift", kind = "slider", name = "Подъём теней", default = 0, lo = -0.5, hi = 0.5, amin = -5, amax = 5, integer = false },
       { id = "InGamma", kind = "slider", name = "Гамма", default = 1, lo = 0.2, hi = 3, amin = 0.01, amax = 10, integer = false },
@@ -99,13 +89,11 @@ return {
       { id = "BalB", kind = "slider", name = "Баланс: синий", default = 1, lo = 0, hi = 2, amin = 0, amax = 10, integer = false },
     } },
     { id = "SecShift", title = "Сдвиг цвета", open = false, controls = {
-      { id = "NoteShift", kind = "note", name = "Поворот оттенка и насыщенность картинки до кинескопа." },
       { id = "ShiftOn", kind = "check", name = "Включить", default = 0 },
       { id = "HueShift", kind = "slider", name = "Оттенок", default = 0, lo = -180, hi = 180, amin = -1000, amax = 1000, integer = false },
       { id = "SatShift", kind = "slider", name = "Насыщенность", default = 1, lo = 0, hi = 2, amin = 0, amax = 10, integer = false },
     } },
     { id = "SecMono", title = "Монохромный экран", open = false, controls = {
-      { id = "NoteMono", kind = "note", name = "Картинка в один цвет люминофора: зелёный терминал, янтарный монитор. Режим — как цвет смешивается с яркостью." },
       { id = "MonoOn", kind = "check", name = "Включить", default = 0 },
       { id = "MonoAmount", kind = "slider", name = "Сила", default = 1, lo = 0, hi = 1, amin = 0, amax = 1, integer = false },
       { id = "MonoMode", kind = "combo", name = "Режим", default = 0, options = { "Умножение", "Экран", "Наложение", "Затемнение основы" } },
@@ -113,19 +101,16 @@ return {
       { id = "MonoBoost", kind = "slider", name = "Яркость", default = 1.3, lo = 0, hi = 3, amin = 0, amax = 20, integer = false },
     } },
     { id = "SecRes", title = "Цветовая глубина", open = false, controls = {
-      { id = "NoteRes", kind = "note", name = "Меньше уровней — заметнее ступеньки в градиентах, эффект старой видеокарты." },
       { id = "ColorResOn", kind = "check", name = "Включить", default = 0 },
       { id = "ColorLevels", kind = "slider", name = "Уровней на канал", default = 16, lo = 2, hi = 64, amin = 2, amax = 1024, integer = true },
     } },
     { id = "SecBleed", title = "Растекание цвета", open = false, controls = {
-      { id = "NoteBleed", kind = "note", name = "Цвет «растекается» вправо по строке, как у аналогового сигнала. Влияет только на цвет, резкость яркости остаётся." },
       { id = "BleedOn", kind = "check", name = "Включить", default = 0 },
       { id = "BleedStrength", kind = "slider", name = "Сила", default = 0.7, lo = 0, hi = 1, amin = 0, amax = 1, integer = false },
       { id = "BleedBlur", kind = "slider", name = "Размытие (px)", default = 8, lo = 0, hi = 40, amin = 0, amax = 500, integer = false },
       { id = "BleedShift", kind = "slider", name = "Сдвиг вправо (px)", default = 2, lo = -20, hi = 20, amin = -500, amax = 500, integer = false },
     } },
     { id = "SecOut", title = "Цвет на выходе", open = false, controls = {
-      { id = "NoteOut", kind = "note", name = "Цвет ПОСЛЕ эффекта: финальная яркость, контраст, насыщенность. «Обрезать 0–1» убирает пересветы." },
       { id = "OutGain", kind = "slider", name = "Яркость", default = 1, lo = 0, hi = 4, amin = 0, amax = 100, integer = false },
       { id = "OutLift", kind = "slider", name = "Подъём теней", default = 0, lo = -0.5, hi = 0.5, amin = -5, amax = 5, integer = false },
       { id = "OutGamma", kind = "slider", name = "Гамма", default = 1, lo = 0.2, hi = 3, amin = 0.01, amax = 10, integer = false },
@@ -134,7 +119,6 @@ return {
       { id = "OutClip", kind = "check", name = "Обрезать 0–1", default = 0 },
     } },
     { id = "SecFlick", title = "Мерцание", open = false, controls = {
-      { id = "NoteFlick", kind = "note", name = "Мигание яркости всего кадра. «Плавность» 0 — резкие скачки, 1 — медленное «дыхание». Каналы — какие цвета мерцают." },
       { id = "FlickOn", kind = "check", name = "Включить", default = 0 },
       { id = "FlickType", kind = "combo", name = "Тип", default = 0, options = { "Яркость", "Гамма" } },
       { id = "FlickAmount", kind = "slider", name = "Сила", default = 0.08, lo = 0, hi = 1, amin = 0, amax = 1, integer = false },
@@ -145,7 +129,6 @@ return {
       { id = "FlickB", kind = "check", name = "Синий", default = 1 },
     } },
     { id = "SecBand", title = "Затвор (бегущая полоса)", open = false, controls = {
-      { id = "NoteBand", kind = "note", name = "Светлая или тёмная полоса, бегущая по экрану (как при съёмке ТВ камерой)." },
       { id = "BandOn", kind = "check", name = "Включить", default = 0 },
       { id = "BandStrength", kind = "slider", name = "Сила", default = 0.25, lo = 0, hi = 1, amin = 0, amax = 5, integer = false },
       { id = "BandGamma", kind = "slider", name = "Гамма полосы", default = 0, lo = -1, hi = 1, amin = -5, amax = 5, integer = false },
@@ -156,7 +139,6 @@ return {
       { id = "BandDark", kind = "check", name = "Тёмная полоса", default = 0 },
     } },
     { id = "SecNoise", title = "Плёночное зерно", open = false, controls = {
-      { id = "NoteNoise", kind = "note", name = "Живое зерно поверх изображения. «Мелкость» — размер зерна, «Скорость» — как часто меняется." },
       { id = "NoiseOn", kind = "check", name = "Включить", default = 0 },
       { id = "NoiseAmount", kind = "slider", name = "Сила", default = 0.12, lo = 0, hi = 1, amin = 0, amax = 1, integer = false },
       { id = "NoiseSize", kind = "slider", name = "Мелкость зерна", default = 400, lo = 10, hi = 1000, amin = 1, amax = 10000, integer = false },
@@ -164,7 +146,6 @@ return {
       { id = "NoiseContrast", kind = "slider", name = "Контраст зерна", default = 2, lo = 0, hi = 5, amin = 0, amax = 50, integer = false },
     } },
     { id = "SecShake", title = "Тряска", open = false, controls = {
-      { id = "NoteShake", kind = "note", name = "Мелкая тряска кадра. «До пикселей» — трясётся картинка под сеткой, иначе вместе с сеткой. «Дёрганость» — доля резких рывков." },
       { id = "ShakeOn", kind = "check", name = "Включить", default = 0 },
       { id = "ShakeBefore", kind = "check", name = "До пикселей", default = 1 },
       { id = "ShakeX", kind = "slider", name = "Амплитуда X", default = 0.002, lo = 0, hi = 0.03, amin = 0, amax = 1, integer = false },
@@ -174,7 +155,7 @@ return {
       { id = "ShakeEdges", kind = "combo", name = "Края", default = 3, options = { "Холст", "Повтор", "Дублирование", "Зеркало" } },
     } },
   },
-  PRESET_NAMES = { "По умолчанию (как в уроке)", "Классический ТВ", "Аркадный автомат", "Зелёный терминал", "Янтарный монитор", "VHS-мечта", "Сломанный телевизор", "Снято на камеру", "Мягкий ретро", "Киберпанк" },
+  PRESET_NAMES = { "По умолчанию (как в уроке)", "Классический ТВ", "Аркадный автомат", "Зелёный терминал", "Янтарный монитор", "VHS-мечта", "Сломанный телевизор", "Снято на камеру", "Мягкий ретро", "Киберпанк", "Неоновый клуб", "Y2K камкордер", "8-бит аркада", "Хоум-видео", "Холодный монитор", "Глитч-клип", "Мягкий LCD", "Тёплый винтаж" },
   DEFAULTS = { GlobalMix = 1, PerfOn = 0, PixOn = 1, PixPattern = 0, RGBMode = 0, PixSize = 1, PixScaleRes = 0, PixDown = 1, PixSmoothDown = 0, PixStrength = 1, PixSoft = 0.2, PixBrightOn = 1, PixBright = 2, PixGamma = 0.635, ScanOn = 0, ScanStrength = 0.4, ScanLink = 1, ScanPeriod = 4, ScanBeam = 0.6, ScanSoft = 0.5, ConvOn = 0, ConvRX = 1.5, ConvRY = 0, ConvBX = -1.5, ConvBY = 0, CurveOn = 0, CurveAmount = 0.15, VigOn = 0, VigAmount = 0.5, VigSize = 1.25, VigSoft = 0.5, CornerOn = 0, CornerRadius = 0.08, CornerInset = 0.015, CornerSoft = 0.004, PersistOn = 0, PersistAmount = 0.6, GlareOn = 0, GlareAmount = 0.35, GlareX = 0.28, GlareY = 0.78, GlareSize = 0.35, GlowOn = 1, GlowThreshold = 0.1, GlowGain = 1.5, GlowSize = 8, TubeOn = 0, TubeAmount = 0.25, TubeSize = 60, TubeColorRed = 0.65, TubeColorGreen = 0.8, TubeColorBlue = 1.0, InGain = 1, InLift = 0, InGamma = 1, InContrast = 0, InSat = 1, BalR = 1, BalG = 1, BalB = 1, ShiftOn = 0, HueShift = 0, SatShift = 1, MonoOn = 0, MonoAmount = 1, MonoMode = 0, MonoColorRed = 0.25, MonoColorGreen = 1.0, MonoColorBlue = 0.4, MonoBoost = 1.3, ColorResOn = 0, ColorLevels = 16, BleedOn = 0, BleedStrength = 0.7, BleedBlur = 8, BleedShift = 2, OutGain = 1, OutLift = 0, OutGamma = 1, OutContrast = 0, OutSat = 1, OutClip = 0, FlickOn = 0, FlickType = 0, FlickAmount = 0.08, FlickSpeed = 1, FlickSmooth = 0.5, FlickR = 1, FlickG = 1, FlickB = 1, BandOn = 0, BandStrength = 0.25, BandGamma = 0, BandSpeed = 0.3, BandReverse = 0, BandHeight = 0.3, BandSoft = 0.5, BandDark = 0, NoiseOn = 0, NoiseAmount = 0.12, NoiseSize = 400, NoiseSpeed = 5, NoiseContrast = 2, ShakeOn = 0, ShakeBefore = 1, ShakeX = 0.002, ShakeY = 0.002, ShakeSpeed = 1, ShakeJitter = 0.3, ShakeEdges = 3 },
   PRESETS = {
     [0] = {  },
@@ -187,5 +168,13 @@ return {
     [7] = { PixSize = 2, PixPattern = 1, BandOn = 1, BandStrength = 0.35, BandSpeed = 0.25, BandHeight = 0.5, BandSoft = 0.8, VigOn = 1, VigAmount = 0.5, CornerOn = 1, CurveOn = 1, CurveAmount = 0.2, GlowGain = 2, GlowSize = 20, NoiseOn = 1, NoiseAmount = 0.1, TubeOn = 1, TubeAmount = 0.25 },
     [8] = { PixStrength = 0.6, PixSoft = 0.5, PixGamma = 0.85, PixBright = 1.6, GlowGain = 1.8, GlowSize = 20, GlowThreshold = 0.2, OutContrast = -0.05, InSat = 0.9, VigOn = 1, VigAmount = 0.3, PixPattern = 5 },
     [9] = { BalR = 1.1, BalG = 0.85, BalB = 1.25, InSat = 1.4, InContrast = 0.15, GlowGain = 3, GlowSize = 18, GlowThreshold = 0.05, ConvOn = 1, ConvRX = 1.5, ConvBX = -1.5, PixPattern = 2, ScanOn = 1, ScanStrength = 0.3, ShiftOn = 1, HueShift = -12, SatShift = 1.2, TubeOn = 1, TubeAmount = 0.35, TubeColorRed = 0.5, TubeColorGreen = 0.6, TubeColorBlue = 1.0 },
+    [10] = { PixPattern = 2, PixSize = 1.5, GlowGain = 3.5, GlowSize = 20, GlowThreshold = 0.05, InSat = 1.5, BalR = 1.1, BalB = 1.3, ScanOn = 1, ScanStrength = 0.3, ConvOn = 1, ConvRX = 2, ConvBX = -2, VigOn = 1, VigAmount = 0.4 },
+    [11] = { PixStrength = 0.5, PixPattern = 5, NoiseOn = 1, NoiseAmount = 0.15, InSat = 0.9, OutContrast = 0.1, BleedOn = 1, BleedStrength = 0.5, BleedShift = 3, ShakeOn = 1, ShakeX = 0.001, ShakeY = 0.001, ShakeJitter = 0.2, GlowGain = 1.5 },
+    [12] = { PixSize = 3, PixPattern = 7, ColorResOn = 1, ColorLevels = 6, ScanOn = 1, ScanStrength = 0.5, GlowGain = 2.5, CurveOn = 1, CurveAmount = 0.1, CornerOn = 1 },
+    [13] = { PixStrength = 0.45, PixSoft = 0.6, NoiseOn = 1, NoiseAmount = 0.2, BandOn = 1, BandStrength = 0.2, BandSpeed = 0.2, InSat = 0.8, OutGamma = 1.1, FlickOn = 1, FlickAmount = 0.06, BleedOn = 1, BleedStrength = 0.6, VigOn = 1, VigAmount = 0.5 },
+    [14] = { BalR = 0.85, BalB = 1.3, PixPattern = 3, ScanOn = 1, ScanStrength = 0.4, CurveOn = 1, CurveAmount = 0.15, CornerOn = 1, VigOn = 1, VigAmount = 0.5, GlareOn = 1, GlareAmount = 0.35, TubeOn = 1, TubeAmount = 0.3, TubeColorRed = 0.5, TubeColorGreen = 0.7, TubeColorBlue = 1.0 },
+    [15] = { RGBMode = 2, ConvOn = 1, ConvRX = 5, ConvBX = -4, ShakeOn = 1, ShakeX = 0.01, ShakeY = 0.004, ShakeSpeed = 4, ShakeJitter = 0.9, FlickOn = 1, FlickAmount = 0.25, FlickSmooth = 0, BandOn = 1, BandSpeed = 2, BandStrength = 0.5, NoiseOn = 1, NoiseAmount = 0.2, InSat = 1.4 },
+    [16] = { PixPattern = 5, PixStrength = 0.5, PixSoft = 0.4, GlowGain = 1.2, OutContrast = -0.05, InSat = 1.05 },
+    [17] = { BalR = 1.2, BalG = 1.02, BalB = 0.8, InSat = 0.8, PixPattern = 1, ScanOn = 1, ScanStrength = 0.3, CurveOn = 1, CurveAmount = 0.12, CornerOn = 1, VigOn = 1, VigAmount = 0.55, NoiseOn = 1, NoiseAmount = 0.1, GlareOn = 1, GlareAmount = 0.25, PersistOn = 1, PersistAmount = 0.5, TubeOn = 1, TubeAmount = 0.25, TubeColorRed = 1.0, TubeColorGreen = 0.75, TubeColorBlue = 0.45 },
   },
 }
