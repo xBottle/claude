@@ -235,6 +235,19 @@ SECTIONS = [
 
 COLOR_GROUP = 40
 
+# Вкладки Инспектора (v2): раздел -> вкладка. Порядок вкладок = порядок здесь.
+PAGES = [
+    ("Главное", ["SecPresets", "SecGlobal"]),
+    ("Пиксели", ["SecPixels", "SecScan", "SecConv"]),
+    ("Экран", ["SecScreen", "SecGlow", "SecTube"]),
+    ("Цвет", ["SecIn", "SecShift", "SecMono", "SecRes", "SecBleed", "SecOut"]),
+    ("Помехи", ["SecFlick", "SecBand", "SecNoise", "SecShake"]),
+]
+_by_id = {sec[0]: sec for sec in SECTIONS}
+assert sorted(_by_id) == sorted(i for _, ids in PAGES for i in ids), "PAGES must cover all sections"
+PAGE_OF = {i: pg for pg, ids in PAGES for i in ids}
+SECTIONS[:] = [_by_id[i] for _, ids in PAGES for i in ids]
+
 
 def value_ids():
     """(id, default) of every control that stores a value (presets operate on these)."""
@@ -989,15 +1002,16 @@ def build_ctrl_and_inputs(values):
     ctrl.val("Width", 1).val("Height", 1).val("UseFrameFormatSettings", 0)
     ctrl.user_controls = []
     group_inputs = ["MainInput1 = InstanceInput {\n\tSourceOp = \"InRouter\",\n\tSource = \"Input\",\n}"]
-    first = True
+    cur_page = None
     for sid, sname, is_open, items in SECTIONS:
         count = sum(3 if c.kind == "color" else 1 for c in items)
         lab = C(sid, "label", sname, is_open=is_open)
         lab.count = count
         ctrl.val(sid, 1 if is_open else 0)
         ctrl.user_controls.append(uc_def(lab))
-        page = '\n\tPage = "Controls",' if first else ""
-        first = False
+        pg = PAGE_OF[sid]
+        page = f'\n\tPage = {lstr(pg)},' if pg != cur_page else ""
+        cur_page = pg
         group_inputs.append(f"{sid} = InstanceInput {{\n\tSourceOp = \"Ctrl\",\n\tSource = \"{sid}\",{page}\n}}")
         for c in items:
             if c.kind == "color":
@@ -1031,6 +1045,66 @@ def build_ctrl_and_inputs(values):
     return ctrl, group_inputs
 
 
+CORE_IDS = None
+
+
+def core_tool(name, pos, src, stage, orig=None):
+    t = Tool(name, "Fuse.CRTCore", pos)
+    for k, _ in value_ids():
+        t.expr(k, f"Ctrl.{k}", DEFAULTS[k])
+    t.val("Stage", stage)
+    t.link("Input", src)
+    if orig:
+        t.link("Original", orig)
+    return t
+
+
+def build_tools_v2():
+    """Процедурная цепочка: 2 прохода GPU-ядра + размытия встроенными нодами."""
+    tools = [Tool("InRouter", "PipeRouter", (-1600, 0), info="PipeRouterInfo")]
+    W = "InRouter.Output.Width"
+    bl = Tool("BleedBlur", "Blur", (-1485, 95))
+    bl.fuid("Filter", "Fast Gaussian").val("LockXY", 0).val("YBlurSize", 0)
+    bl.expr("XBlurSize", "Ctrl.BleedOn*Ctrl.BleedBlur", 8).link("Input", "InRouter")
+    tools.append(bl)
+    bs = Tool("BleedShift", "Transform", (-1485, 160))
+    bs.link("Input", "BleedBlur").val("Edges", 2)
+    bs.expr("Center", "Point(0.5 + Ctrl.BleedShift/1920, 0.5)", (0.5, 0.5))
+    tools.append(bs)
+    tools.append(merge("BleedMerge", (-1370, 0), "InRouter", "BleedShift", mode="Color",
+                       blend="Ctrl.BleedOn*Ctrl.BleedStrength"))
+    tools.append(core_tool("CoreA", (-1255, 0), "BleedMerge", 0))
+    glow = Tool("Glow", "SoftGlow", (-1140, 0))
+    glow.expr("Threshold", "Ctrl.GlowThreshold", 0.1).expr("Gain", "Ctrl.GlowGain", 1.5)
+    glow.expr("XGlowSize", "Ctrl.GlowOn*Ctrl.GlowSize", 8).expr("Blend", "Ctrl.GlowOn", 1)
+    glow.link("Input", "CoreA")
+    tools.append(glow)
+    tb = Tool("TubeBlur", "Blur", (-1025, 95))
+    tb.fuid("Filter", "Fast Gaussian").expr("XBlurSize", "Ctrl.TubeOn*Ctrl.TubeSize", 60).link("Input", "Glow")
+    tools.append(tb)
+    tools.append(background("TubeColorBG", (-1025, 190), 1, 1, (0.65, 0.8, 1, 1),
+                            {"TopLeftRed": "Ctrl.TubeColorRed", "TopLeftGreen": "Ctrl.TubeColorGreen",
+                             "TopLeftBlue": "Ctrl.TubeColorBlue"}))
+    tools.append(merge("TubeTint", (-1025, 140), "TubeBlur", "TubeColorBG", mode="Multiply", edges=1))
+    tools.append(merge("TubeMerge", (-910, 0), "Glow", "TubeTint", mode="Screen",
+                       blend="Ctrl.TubeOn*Ctrl.TubeAmount"))
+    tools.append(core_tool("FinalMix", (-795, 0), "TubeMerge", 1, orig="InRouter"))
+    return tools
+
+
+def build_fuse():
+    """Собирает CRTCore.fuse из шаблона: список параметров = value_ids()."""
+    tpl = open(os.path.join(HERE, "crt_core_template.fuse"), encoding="utf-8").read()
+    ids = [k for k, _ in value_ids()]
+    fields = "\n".join(f"    float {k};" for k in ids)
+    create = "    INP = {}\n" + "\n".join(
+        f'    INP["{k}"] = self:AddInput("{k}", "{k}", {{ LINKID_DataType = "Number", '
+        f'INPID_InputControl = "SliderControl", INP_Default = {lnum(DEFAULTS[k])} }})' for k in ids)
+    read = "    for k, inp in pairs(INP) do V[k] = num(inp, req) end"
+    return (tpl.replace("__PARAM_FIELDS__", fields).replace("__CREATE_INPUTS__", create)
+            .replace("__READ_INPUTS__", read))
+
+
 def build_setting(preset_index=0):
     values = dict(DEFAULTS)
     values.update(PRESETS[preset_index])
@@ -1039,7 +1113,7 @@ def build_setting(preset_index=0):
         if c.id == "PresetSel":
             c.options = PRESET_NAMES + ["★ " + n for n in own_presets()]
     ctrl, gin = build_ctrl_and_inputs(values)
-    tools = [ctrl] + build_tools()
+    tools = [ctrl] + build_tools_v2()
     ind = "\t\t\t\t"
     inputs_txt = ",\n".join(ind + g.replace("\n", "\n" + ind) for g in gin)
     tools_txt = ",\n".join(t.render(4) for t in tools)
@@ -1118,6 +1192,8 @@ def main():
         out_dir = tempfile.mkdtemp(prefix="crt-pack-")
     setting = os.path.join(out_dir, "CRT Pro v2.setting")
     write_effect(out_dir, "CRT Pro v2", build_setting(0), ("2.0", "0x9933ff"))
+    with open(os.path.join(out_dir, "CRTCore.fuse"), "w", encoding="utf-8") as f:
+        f.write(build_fuse())
     print(f"собрано: CRT Pro.setting (своих пресетов в списке: {len(own_presets())})")
     if not check(setting):
         print("ОСТАНОВКА: проверка нашла проблемы, в Resolve ничего не установлено")
@@ -1142,7 +1218,10 @@ def main():
         old = os.path.join(os.path.dirname(LIB), "CRT Pro v2" + ext)  # старое место: прямо в Claude/
         if os.path.exists(old):
             os.remove(old)
-    print(f"установлено: {LIB}")
+    fuses = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(EFFECTS))), "Fuses")
+    os.makedirs(fuses, exist_ok=True)
+    shutil.copy2(os.path.join(HERE, "CRTCore.fuse"), os.path.join(fuses, "CRTCore.fuse"))
+    print(f"установлено: {LIB} и {fuses}/CRTCore.fuse")
     print("перезапусти Resolve и перетащи CRT Pro на клип заново")
 
 

@@ -127,7 +127,7 @@ end
 local selected = nil     -- { kind = "builtin"/"own", index = i, name = "..." }
 local statusText = ""
 local reopen = true
-local geom = { 200, 120, 380, 720 }
+local geom = { 200, 100, 390, 860 }
 
 while reopen do
     reopen = false
@@ -141,46 +141,66 @@ while reopen do
         items[#items + 1] = { kind = "own", name = n, ico = "preset_own" }
     end
 
+    local CARD = [[QPushButton { background:#15171c; border:2px solid #2a2e37; border-radius:8px; padding:2px; }
+QPushButton:hover { border-color:#4b8fd6; }]]
+    local CARD_SEL = [[QPushButton { background:#15171c; border:2px solid #5fd3ff; border-radius:8px; padding:2px; }]]
+    local function btnStyle(color)
+        return "QPushButton { background:#1c1f26; color:" .. color .. "; border:1px solid " .. color ..
+            "; border-radius:6px; padding:7px; font-weight:bold; } QPushButton:hover { background:#252a33; }"
+    end
+    local BLUE, WHITE, GREEN, RED = "#6fb7ff", "#e8e8e8", "#6fdc8c", "#ff7a7a"
+
     local rows = {}
     for r = 1, #items, 2 do
         local cells = {}
         for c = r, math.min(r + 1, #items) do
             local it = items[c]
-            cells[#cells + 1] = ui:Button{
-                ID = "card_" .. c,
-                Text = (it.kind == "own" and "★ " or "") .. it.name,
-                Icon = icon(it.ico) or icon("preset_0"),
-                IconSize = { 150, 64 },
-                MinimumSize = { 165, 96 },
-                ToolTip = it.name,
+            local isSel = selected and selected.name == it.name and selected.kind == it.kind
+            cells[#cells + 1] = ui:VGroup{
+                Weight = 1, Spacing = 2,
+                ui:Button{
+                    ID = "card_" .. c, Text = "",
+                    Icon = icon(it.ico) or icon("preset_0"),
+                    IconSize = { 150, 84 }, MinimumSize = { 160, 92 }, MaximumSize = { 400, 92 },
+                    ToolTip = it.name, StyleSheet = isSel and CARD_SEL or CARD,
+                },
+                ui:Label{
+                    Text = (it.kind == "own" and "★ " or "") .. it.name, Alignment = { AlignHCenter = true },
+                    StyleSheet = "color:#d8dce4; font-weight:bold;",
+                },
             }
         end
-        rows[#rows + 1] = ui:HGroup{ Weight = 0, tunpack(cells) }
+        if #cells == 1 then cells[2] = ui:HGap(160) end
+        rows[#rows + 1] = ui:HGroup{ Weight = 0, Spacing = 8, tunpack(cells) }
     end
 
     local win = disp:AddWindow({
         ID = "CRTPresetsWin",
-        WindowTitle = "CRT Pro 2.0 — Пресеты",
+        WindowTitle = "CRT Pro v2 — Пресеты",
         Geometry = geom,
+        StyleSheet = [[QWidget { background:#181a20; color:#d8dce4; font-size:12px; }
+QLineEdit { background:#111318; border:1px solid #333844; border-radius:6px; padding:7px; font-size:13px; }]],
         ui:VGroup{
-            Spacing = 6,
-            ui:Label{ Text = "<b style='font-size:20px'>ПРЕСЕТЫ</b>", Alignment = { AlignHCenter = true }, Weight = 0 },
-            ui:VGroup{ Weight = 1, tunpack(rows) },
+            Spacing = 8,
+            ui:Label{ Text = "<img src='" .. DIR .. "icons/title.png'>", Alignment = { AlignHCenter = true }, Weight = 0 },
+            ui:VGroup{ Weight = 1, Spacing = 6, tunpack(rows) },
             ui:LineEdit{ ID = "NameEdit", PlaceholderText = "Название пресета", Weight = 0,
                 Text = selected and selected.name or "" },
             ui:HGroup{ Weight = 0,
-                ui:Button{ ID = "BtnLoad", Text = "Применить" },
-                ui:Button{ ID = "BtnCopy", Text = "Скопировать код" },
+                ui:Button{ ID = "BtnLoad", Text = "Применить", StyleSheet = btnStyle(BLUE) },
+                ui:Button{ ID = "BtnCopy", Text = "Скопировать код", StyleSheet = btnStyle(WHITE) },
             },
             ui:HGroup{ Weight = 0,
-                ui:Button{ ID = "BtnSave", Text = "Сохранить мой" },
-                ui:Button{ ID = "BtnPaste", Text = "Сохранить из буфера" },
+                ui:Button{ ID = "BtnSave", Text = "Сохранить мой", StyleSheet = btnStyle(GREEN) },
+                ui:Button{ ID = "BtnPaste", Text = "Сохранить из буфера", StyleSheet = btnStyle(GREEN) },
             },
             ui:HGroup{ Weight = 0,
-                ui:Button{ ID = "BtnRename", Text = "Переименовать" },
-                ui:Button{ ID = "BtnDelete", Text = "Удалить" },
+                ui:Button{ ID = "BtnRename", Text = "Переименовать", StyleSheet = btnStyle(WHITE) },
+                ui:Button{ ID = "BtnDelete", Text = "Удалить", StyleSheet = btnStyle(RED) },
             },
-            ui:Label{ ID = "Status", Text = statusText, Weight = 0, WordWrap = true },
+            ui:Label{ ID = "Status", Text = statusText, Weight = 0, WordWrap = true, StyleSheet = "color:#6fb7ff;" },
+            ui:Label{ Text = "CRT Pro v2 · процедурное ядро", Weight = 0, Alignment = { AlignHCenter = true },
+                StyleSheet = "color:#5a606c; font-size:10px;" },
         },
     })
     local itm = win:GetItems()
@@ -208,6 +228,7 @@ while reopen do
     -- клик по карточке: выбрать и сразу применить
     for c, it in ipairs(items) do
         win.On["card_" .. c].Clicked = function()
+            for c2 = 1, #items do pcall(function() itm["card_" .. c2].StyleSheet = (c2 == c) and CARD_SEL or CARD end) end
             selected = it
             itm.NameEdit.Text = it.name
             apply(it)

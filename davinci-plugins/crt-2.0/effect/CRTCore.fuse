@@ -1,0 +1,554 @@
+--[[
+CRT Core — процедурное GPU-ядро эффекта CRT Pro v2.
+Вся картинка считается одной формулой на видеокарте (DVIPComputeNode),
+без десятков нод. Stage 0 — «до свечения» (цвет, узор пикселей, строки,
+сведение), Stage 1 — «после свечения» (выпуклость, глубина цвета, полоса,
+мерцание, виньетка, зерно, углы, цвет на выходе, общий микс).
+Файл собран автоматически из build_crt_pro_2.py — правь шаблон, не результат.
+]]
+
+FuRegisterClass("CRTCore", CT_Tool, {
+    REGS_Name = "CRT Core",
+    REGS_Category = "Claude",
+    REGS_OpIconString = "CRTc",
+    REGS_OpDescription = "Procedural CRT core (GPU)",
+    REG_NoMotionBlurCtrls = true,
+    REG_NoBlendCtrls = true,
+    REG_OpNoMask = true,
+    REG_TimeVariant = true,
+    REG_SupportsDoD = false,
+    REG_Version = 2,
+})
+
+CRTParams = [[
+    float w; float h; float cell; float stage;
+    float GlobalMix;
+    float PixOn;
+    float PixPattern;
+    float RGBMode;
+    float PixSize;
+    float PixScaleRes;
+    float PixDown;
+    float PixSmoothDown;
+    float PixStrength;
+    float PixSoft;
+    float PixBrightOn;
+    float PixBright;
+    float PixGamma;
+    float ScanOn;
+    float ScanStrength;
+    float ScanLink;
+    float ScanPeriod;
+    float ScanBeam;
+    float ScanSoft;
+    float ConvOn;
+    float ConvRX;
+    float ConvRY;
+    float ConvBX;
+    float ConvBY;
+    float CurveOn;
+    float CurveAmount;
+    float VigOn;
+    float VigAmount;
+    float VigSize;
+    float VigSoft;
+    float CornerOn;
+    float CornerRadius;
+    float CornerInset;
+    float CornerSoft;
+    float GlowOn;
+    float GlowThreshold;
+    float GlowGain;
+    float GlowSize;
+    float TubeOn;
+    float TubeAmount;
+    float TubeSize;
+    float TubeColorRed;
+    float TubeColorGreen;
+    float TubeColorBlue;
+    float InGain;
+    float InLift;
+    float InGamma;
+    float InContrast;
+    float InSat;
+    float BalR;
+    float BalG;
+    float BalB;
+    float ShiftOn;
+    float HueShift;
+    float SatShift;
+    float MonoOn;
+    float MonoAmount;
+    float MonoMode;
+    float MonoColorRed;
+    float MonoColorGreen;
+    float MonoColorBlue;
+    float MonoBoost;
+    float ColorResOn;
+    float ColorLevels;
+    float BleedOn;
+    float BleedStrength;
+    float BleedBlur;
+    float BleedShift;
+    float OutGain;
+    float OutLift;
+    float OutGamma;
+    float OutContrast;
+    float OutSat;
+    float OutClip;
+    float FlickOn;
+    float FlickType;
+    float FlickAmount;
+    float FlickSpeed;
+    float FlickSmooth;
+    float FlickR;
+    float FlickG;
+    float FlickB;
+    float BandOn;
+    float BandStrength;
+    float BandGamma;
+    float BandSpeed;
+    float BandReverse;
+    float BandHeight;
+    float BandSoft;
+    float BandDark;
+    float NoiseOn;
+    float NoiseAmount;
+    float NoiseSize;
+    float NoiseSpeed;
+    float NoiseContrast;
+    float ShakeOn;
+    float ShakeBefore;
+    float ShakeX;
+    float ShakeY;
+    float ShakeSpeed;
+    float ShakeJitter;
+    float ShakeEdges;
+    float shakeU; float shakeV; float flickN; float bandY; float seed; float period;
+]]
+
+CRTKernel = [[
+__DEVICE__ float cl01(float v) { return _fminf(_fmaxf(v, 0.0f), 1.0f); }
+__DEVICE__ float fract1(float v) { return v - _floor(v); }
+__DEVICE__ float sstep(float a, float b, float v) {
+    float t = cl01((v - a) / _fmaxf(b - a, 1e-5f));
+    return t * t * (3.0f - 2.0f * t);
+}
+__DEVICE__ float hash3(float x, float y, float z) {
+    return fract1(_sinf(x * 12.9898f + y * 78.233f + z * 37.719f) * 43758.5453f);
+}
+__DEVICE__ float luma(float r, float g, float b) { return 0.2126f * r + 0.7152f * g + 0.0722f * b; }
+__DEVICE__ float gam(float v, float g) { return v > 0.0f ? _powf(v, 1.0f / _fmaxf(g, 0.01f)) : v; }
+__DEVICE__ float gradeCh(float v, float gain, float lift, float gm, float con) {
+    v = v * gain;
+    v = v + lift * (1.0f - v);
+    v = gam(v, gm);
+    v = (v - 0.5f) * (1.0f + con) + 0.5f;
+    return v;
+}
+/* soft «окно» 0..1 внутри отрезка [a,b] с мягкостью s (в долях ячейки) */
+__DEVICE__ float band1(float t, float a, float b, float s) {
+    return sstep(a - s, a + s, t) * (1.0f - sstep(b - s, b + s, t));
+}
+/* маска для одного субпикселя-кружка */
+__DEVICE__ float dot1(float dx, float dy, float r, float s) {
+    float d = _sqrtf(dx * dx + dy * dy);
+    return 1.0f - sstep(r - s, r + s, d);
+}
+
+__KERNEL__ void CRTKernel(__CONSTANTREF__ CRTParams *p, __TEXTURE2D__ src, __TEXTURE2D__ org, __TEXTURE2D_WRITE__ dst)
+{
+    DEFINE_KERNEL_ITERATORS_XY(x, y);
+    if (x >= (int)p->w || y >= (int)p->h) return;
+    float fx = (float)x + 0.5f, fy = (float)y + 0.5f;
+    float W = p->w, H = p->h;
+    float r, g, b, a;
+
+    if (p->stage < 0.5f) {
+        /* ---------------- STAGE 0 ---------------- */
+        float S = p->cell;
+        float px = fx + p->shakeU * W, py = fy + p->shakeV * H;
+        float split = (p->RGBMode > 1.5f) ? S / 3.0f : 0.0f;
+        float rx = px - split - (p->ConvOn > 0.5f ? p->ConvRX : 0.0f);
+        float ry = py - (p->ConvOn > 0.5f ? p->ConvRY : 0.0f);
+        float bx = px + split - (p->ConvOn > 0.5f ? p->ConvBX : 0.0f);
+        float by = py - (p->ConvOn > 0.5f ? p->ConvBY : 0.0f);
+        float gx = px, gy = py;
+        if (p->PixDown > 0.5f) {
+            rx = (_floor(rx / S) + 0.5f) * S; ry = (_floor(ry / S) + 0.5f) * S;
+            gx = (_floor(gx / S) + 0.5f) * S; gy = (_floor(gy / S) + 0.5f) * S;
+            bx = (_floor(bx / S) + 0.5f) * S; by = (_floor(by / S) + 0.5f) * S;
+        }
+        float4 cr = _tex2DVecN(src, rx / W, ry / H, 15);
+        float4 cg = _tex2DVecN(src, gx / W, gy / H, 15);
+        float4 cb = _tex2DVecN(src, bx / W, by / H, 15);
+        if (p->PixDown > 0.5f && p->PixSmoothDown > 0.5f) {
+            float q = S * 0.25f;
+            float4 c1 = _tex2DVecN(src, (gx - q) / W, (gy - q) / H, 15);
+            float4 c2 = _tex2DVecN(src, (gx + q) / W, (gy - q) / H, 15);
+            float4 c3 = _tex2DVecN(src, (gx - q) / W, (gy + q) / H, 15);
+            float4 c4 = _tex2DVecN(src, (gx + q) / W, (gy + q) / H, 15);
+            cg.x = (c1.x + c2.x + c3.x + c4.x) * 0.25f;
+            cg.y = (c1.y + c2.y + c3.y + c4.y) * 0.25f;
+            cg.z = (c1.z + c2.z + c3.z + c4.z) * 0.25f;
+            if (split == 0.0f && p->ConvOn < 0.5f) { cr = cg; cb = cg; }
+        }
+        r = cr.x; g = cg.y; b = cb.z; a = cg.w;
+
+        /* цвет на входе */
+        r = gradeCh(r, p->InGain * p->BalR, p->InLift, p->InGamma, p->InContrast);
+        g = gradeCh(g, p->InGain * p->BalG, p->InLift, p->InGamma, p->InContrast);
+        b = gradeCh(b, p->InGain * p->BalB, p->InLift, p->InGamma, p->InContrast);
+        { float L = luma(r, g, b); r = L + (r - L) * p->InSat; g = L + (g - L) * p->InSat; b = L + (b - L) * p->InSat; }
+
+        /* сдвиг цвета: поворот оттенка в YIQ + насыщенность */
+        if (p->ShiftOn > 0.5f) {
+            float Y = 0.299f * r + 0.587f * g + 0.114f * b;
+            float I = 0.596f * r - 0.274f * g - 0.322f * b;
+            float Q = 0.211f * r - 0.523f * g + 0.312f * b;
+            float an = p->HueShift * 0.0174533f, cs = _cosf(an), sn = _sinf(an);
+            float I2 = (I * cs - Q * sn) * p->SatShift, Q2 = (I * sn + Q * cs) * p->SatShift;
+            r = Y + 0.956f * I2 + 0.621f * Q2;
+            g = Y - 0.272f * I2 - 0.647f * Q2;
+            b = Y - 1.106f * I2 + 1.703f * Q2;
+        }
+
+        /* монохромный экран */
+        if (p->MonoOn > 0.5f) {
+            float L = luma(r, g, b) * p->MonoBoost;
+            float T[3] = { p->MonoColorRed, p->MonoColorGreen, p->MonoColorBlue };
+            float o[3];
+            for (int i = 0; i < 3; i++) {
+                float t = T[i], m;
+                if (p->MonoMode < 0.5f) m = L * t;
+                else if (p->MonoMode < 1.5f) m = 1.0f - (1.0f - L) * (1.0f - t);
+                else if (p->MonoMode < 2.5f) m = L < 0.5f ? 2.0f * L * t : 1.0f - 2.0f * (1.0f - L) * (1.0f - t);
+                else m = 1.0f - (1.0f - L) / _fmaxf(t, 0.001f);
+                o[i] = m;
+            }
+            float k = p->MonoAmount;
+            r += (o[0] - r) * k; g += (o[1] - g) * k; b += (o[2] - b) * k;
+        }
+
+        /* узор пикселей (процедурный, без тайлов) */
+        if (p->PixOn > 0.5f) {
+            float S3 = S / 3.0f;
+            float cx = fx / S, cy = fy / S;
+            float col = _floor(cx), row = _floor(cy);
+            float ux = fract1(cx), uy = fract1(cy);
+            float sft = 0.02f + p->PixSoft * 0.25f;
+            float mr = 0.0f, mg = 0.0f, mb = 0.0f;
+            float pat = p->PixPattern;
+            /* как в 1.0: ячейка = R | G | B | тёмный зазор, по 1/4 ширины */
+            int k = (int)_floor(ux * 4.0f);
+            float sx = fract1(ux * 4.0f);
+            float stripe = band1(sx, 0.0f, 1.0f, sft);
+            if (pat < 0.5f) {                     /* прямые */
+                float v = stripe * band1(uy, 0.0f, 0.75f, sft);
+                mr = k == 0 ? v : 0.0f; mg = k == 1 ? v : 0.0f; mb = k == 2 ? v : 0.0f;
+            } else if (pat < 1.5f) {              /* со сдвигом */
+                float uy2 = fract1(cy + (fract1(col * 0.5f) > 0.25f ? 0.5f : 0.0f));
+                float v = stripe * band1(uy2, 0.0f, 0.75f, sft);
+                mr = k == 0 ? v : 0.0f; mg = k == 1 ? v : 0.0f; mb = k == 2 ? v : 0.0f;
+            } else if (pat < 2.5f) {              /* апертурная решётка */
+                mr = k == 0 ? stripe : 0.0f; mg = k == 1 ? stripe : 0.0f; mb = k == 2 ? stripe : 0.0f;
+            } else if (pat < 3.5f) {              /* щелевая маска */
+                float uy2 = fract1(cy * 0.5f + (fract1(col * 0.5f) > 0.25f ? 0.5f : 0.0f));
+                float v = stripe * band1(uy2, 0.04f, 0.88f, sft * 0.5f);
+                mr = k == 0 ? v : 0.0f; mg = k == 1 ? v : 0.0f; mb = k == 2 ? v : 0.0f;
+            } else if (pat < 4.5f) {              /* теневая маска: триады */
+                float ox = fract1(col * 0.5f) > 0.25f ? 1.5f : 0.0f;
+                float tx = fx / S3 + ox, ty = fy / (S * 0.5f);
+                int kk = ((int)_floor(tx)) % 3;
+                float v = dot1(fract1(tx) - 0.5f, fract1(ty) - 0.5f, 0.42f, sft);
+                mr = kk == 0 ? v : 0.0f; mg = kk == 1 ? v : 0.0f; mb = kk == 2 ? v : 0.0f;
+            } else if (pat < 5.5f) {              /* LCD-сетка */
+                float v = stripe * band1(uy, 0.08f, 0.92f, sft);
+                mr = 0.25f + 0.75f * (k == 0 ? v : 0.0f);
+                mg = 0.25f + 0.75f * (k == 1 ? v : 0.0f);
+                mb = 0.25f + 0.75f * (k == 2 ? v : 0.0f);
+            } else if (pat < 6.5f) {              /* LED-стена */
+                float v = dot1(sx - 0.5f, (uy - 0.5f) * 1.5f, 0.32f, sft);
+                mr = k == 0 ? v : 0.0f; mg = k == 1 ? v : 0.0f; mb = k == 2 ? v : 0.0f;
+            } else if (pat < 7.5f) {              /* точечная матрица */
+                float v = dot1(ux - 0.5f, uy - 0.5f, 0.3f, sft);
+                mr = v; mg = v; mb = v;
+            } else if (pat < 8.5f) {              /* сетка без цвета */
+                float v = band1(ux, 0.12f, 1.0f, sft) * band1(uy, 0.12f, 1.0f, sft);
+                mr = v; mg = v; mb = v;
+            } else {                              /* только строки */
+                float v = band1(uy, 0.2f, 0.95f, sft);
+                mr = v; mg = v; mb = v;
+            }
+            if (p->RGBMode > 0.5f && p->RGBMode < 1.5f) {   /* имитация без цвета */
+                float m = _fmaxf(mr, _fmaxf(mg, mb)); mr = m; mg = m; mb = m;
+            }
+            float st = p->PixStrength;
+            float gain = 1.0f + st * p->PixBrightOn * (p->PixBright - 1.0f);
+            r = (r + (r * mr - r) * st) * gain;
+            g = (g + (g * mg - g) * st) * gain;
+            b = (b + (b * mb - b) * st) * gain;
+            r = gam(r, p->PixGamma); g = gam(g, p->PixGamma); b = gam(b, p->PixGamma);
+        }
+
+        /* строки развёртки */
+        if (p->ScanOn > 0.5f) {
+            float P = _fmaxf(p->period, 1.0f);
+            float d = _fabs(fract1(fy / P) - 0.5f) * 2.0f;
+            float s = p->ScanSoft * 0.25f;
+            float line = 1.0f - sstep(p->ScanBeam - s, p->ScanBeam + s + 1e-3f, d);
+            float m = 1.0f + (line - 1.0f) * p->ScanStrength;
+            r *= m; g *= m; b *= m;
+        }
+    } else {
+        /* ---------------- STAGE 1 ---------------- */
+        float u = fx / W + p->shakeU, v = fy / H + p->shakeV;
+        if (p->CurveOn > 0.5f) {
+            float X = (u - 0.5f) * 2.0f * W / H, Y = (v - 0.5f) * 2.0f;
+            float sc = 1.0f + p->CurveAmount * (X * X + Y * Y);
+            u = 0.5f + (u - 0.5f) * sc; v = 0.5f + (v - 0.5f) * sc;
+        }
+        float inside = (u >= 0.0f && u <= 1.0f && v >= 0.0f && v <= 1.0f) ? 1.0f : 0.0f;
+        float4 c = _tex2DVecN(src, u, v, 15);
+        r = c.x * inside; g = c.y * inside; b = c.z * inside; a = c.w * inside;
+
+        if (p->ColorResOn > 0.5f) {
+            float L = _fmaxf(p->ColorLevels, 2.0f);
+            r = _floor(r * L + 0.5f) / L; g = _floor(g * L + 0.5f) / L; b = _floor(b * L + 0.5f) / L;
+        }
+        if (p->BandOn > 0.5f) {
+            float hh = p->BandHeight, s = p->BandSoft * hh * 0.5f + 1e-3f;
+            float t = v - p->bandY;
+            float m = band1(t, -hh * 0.5f, hh * 0.5f, s);
+            float gn = 1.0f + p->BandStrength * (1.0f - 2.0f * p->BandDark);
+            float gm = 1.0f + p->BandGamma;
+            r += (gam(r * gn, gm) - r) * m; g += (gam(g * gn, gm) - g) * m; b += (gam(b * gn, gm) - b) * m;
+        }
+        if (p->FlickOn > 0.5f) {
+            float n = p->flickN;
+            if (p->FlickType < 0.5f) {
+                float gn = 1.0f - p->FlickAmount * n;
+                if (p->FlickR > 0.5f) r *= gn; if (p->FlickG > 0.5f) g *= gn; if (p->FlickB > 0.5f) b *= gn;
+            } else {
+                float gm = 1.0f - 0.8f * p->FlickAmount * n;
+                if (p->FlickR > 0.5f) r = gam(r, gm); if (p->FlickG > 0.5f) g = gam(g, gm); if (p->FlickB > 0.5f) b = gam(b, gm);
+            }
+        }
+        if (p->VigOn > 0.5f) {
+            float X = (u - 0.5f) / (p->VigSize * 0.5f), Y = (v - 0.5f) * (H / W) / (p->VigSize * 0.5f) * (W / H);
+            float d = _sqrtf(X * X + Y * Y);
+            float m = sstep(1.0f - p->VigSoft, 1.0f + p->VigSoft * 0.5f, d);
+            float k = 1.0f - p->VigAmount * m;
+            r *= k; g *= k; b *= k;
+        }
+        if (p->NoiseOn > 0.5f) {
+            float gs = _fmaxf(1.0f, 400.0f / _fmaxf(p->NoiseSize, 1.0f));
+            float n = hash3(_floor(fx / gs), _floor(fy / gs), p->seed);
+            n = cl01((n - 0.5f) * p->NoiseContrast + 0.5f);
+            float k = p->NoiseAmount;
+            float o;
+            o = r < 0.5f ? 2.0f * r * n : 1.0f - 2.0f * (1.0f - r) * (1.0f - n); r += (o - r) * k;
+            o = g < 0.5f ? 2.0f * g * n : 1.0f - 2.0f * (1.0f - g) * (1.0f - n); g += (o - g) * k;
+            o = b < 0.5f ? 2.0f * b * n : 1.0f - 2.0f * (1.0f - b) * (1.0f - n); b += (o - b) * k;
+        }
+        if (p->CornerOn > 0.5f) {
+            float asp = W / H;
+            float hx = (0.5f - p->CornerInset) * asp, hy = 0.5f - p->CornerInset * asp;
+            float rad = p->CornerRadius * asp;
+            float qx = _fabs((u - 0.5f) * asp) - (hx - rad), qy = _fabs(v - 0.5f) - (hy - rad);
+            float ox = _fmaxf(qx, 0.0f), oy = _fmaxf(qy, 0.0f);
+            float d = _sqrtf(ox * ox + oy * oy) + _fminf(_fmaxf(qx, qy), 0.0f) - rad;
+            float m = 1.0f - sstep(-p->CornerSoft, p->CornerSoft + 1e-4f, d);
+            r *= m; g *= m; b *= m;
+        }
+        /* цвет на выходе */
+        r = gradeCh(r, p->OutGain, p->OutLift, p->OutGamma, p->OutContrast);
+        g = gradeCh(g, p->OutGain, p->OutLift, p->OutGamma, p->OutContrast);
+        b = gradeCh(b, p->OutGain, p->OutLift, p->OutGamma, p->OutContrast);
+        { float L = luma(r, g, b); r = L + (r - L) * p->OutSat; g = L + (g - L) * p->OutSat; b = L + (b - L) * p->OutSat; }
+        if (p->OutClip > 0.5f) { r = cl01(r); g = cl01(g); b = cl01(b); }
+
+        /* общий микс с оригиналом */
+        float4 o = _tex2DVecN(org, fx / W, fy / H, 15);
+        float m = p->GlobalMix;
+        r = o.x + (r - o.x) * m; g = o.y + (g - o.y) * m; b = o.z + (b - o.z) * m; a = o.w + (a - o.w) * m;
+    }
+    _tex2DVec4Write(dst, x, y, make_float4(r, g, b, a));
+}
+]]
+
+function Create()
+    INP = {}
+    INP["GlobalMix"] = self:AddInput("GlobalMix", "GlobalMix", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 1 })
+    INP["PixOn"] = self:AddInput("PixOn", "PixOn", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 1 })
+    INP["PixPattern"] = self:AddInput("PixPattern", "PixPattern", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0 })
+    INP["RGBMode"] = self:AddInput("RGBMode", "RGBMode", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0 })
+    INP["PixSize"] = self:AddInput("PixSize", "PixSize", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 1 })
+    INP["PixScaleRes"] = self:AddInput("PixScaleRes", "PixScaleRes", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0 })
+    INP["PixDown"] = self:AddInput("PixDown", "PixDown", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 1 })
+    INP["PixSmoothDown"] = self:AddInput("PixSmoothDown", "PixSmoothDown", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0 })
+    INP["PixStrength"] = self:AddInput("PixStrength", "PixStrength", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 1 })
+    INP["PixSoft"] = self:AddInput("PixSoft", "PixSoft", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0.2 })
+    INP["PixBrightOn"] = self:AddInput("PixBrightOn", "PixBrightOn", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 1 })
+    INP["PixBright"] = self:AddInput("PixBright", "PixBright", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 2 })
+    INP["PixGamma"] = self:AddInput("PixGamma", "PixGamma", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0.635 })
+    INP["ScanOn"] = self:AddInput("ScanOn", "ScanOn", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0 })
+    INP["ScanStrength"] = self:AddInput("ScanStrength", "ScanStrength", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0.4 })
+    INP["ScanLink"] = self:AddInput("ScanLink", "ScanLink", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 1 })
+    INP["ScanPeriod"] = self:AddInput("ScanPeriod", "ScanPeriod", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 4 })
+    INP["ScanBeam"] = self:AddInput("ScanBeam", "ScanBeam", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0.6 })
+    INP["ScanSoft"] = self:AddInput("ScanSoft", "ScanSoft", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0.5 })
+    INP["ConvOn"] = self:AddInput("ConvOn", "ConvOn", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0 })
+    INP["ConvRX"] = self:AddInput("ConvRX", "ConvRX", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 1.5 })
+    INP["ConvRY"] = self:AddInput("ConvRY", "ConvRY", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0 })
+    INP["ConvBX"] = self:AddInput("ConvBX", "ConvBX", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = -1.5 })
+    INP["ConvBY"] = self:AddInput("ConvBY", "ConvBY", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0 })
+    INP["CurveOn"] = self:AddInput("CurveOn", "CurveOn", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0 })
+    INP["CurveAmount"] = self:AddInput("CurveAmount", "CurveAmount", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0.15 })
+    INP["VigOn"] = self:AddInput("VigOn", "VigOn", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0 })
+    INP["VigAmount"] = self:AddInput("VigAmount", "VigAmount", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0.5 })
+    INP["VigSize"] = self:AddInput("VigSize", "VigSize", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 1.25 })
+    INP["VigSoft"] = self:AddInput("VigSoft", "VigSoft", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0.5 })
+    INP["CornerOn"] = self:AddInput("CornerOn", "CornerOn", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0 })
+    INP["CornerRadius"] = self:AddInput("CornerRadius", "CornerRadius", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0.08 })
+    INP["CornerInset"] = self:AddInput("CornerInset", "CornerInset", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0.015 })
+    INP["CornerSoft"] = self:AddInput("CornerSoft", "CornerSoft", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0.004 })
+    INP["GlowOn"] = self:AddInput("GlowOn", "GlowOn", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 1 })
+    INP["GlowThreshold"] = self:AddInput("GlowThreshold", "GlowThreshold", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0.1 })
+    INP["GlowGain"] = self:AddInput("GlowGain", "GlowGain", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 1.5 })
+    INP["GlowSize"] = self:AddInput("GlowSize", "GlowSize", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 8 })
+    INP["TubeOn"] = self:AddInput("TubeOn", "TubeOn", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0 })
+    INP["TubeAmount"] = self:AddInput("TubeAmount", "TubeAmount", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0.25 })
+    INP["TubeSize"] = self:AddInput("TubeSize", "TubeSize", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 60 })
+    INP["TubeColorRed"] = self:AddInput("TubeColorRed", "TubeColorRed", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0.65 })
+    INP["TubeColorGreen"] = self:AddInput("TubeColorGreen", "TubeColorGreen", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0.8 })
+    INP["TubeColorBlue"] = self:AddInput("TubeColorBlue", "TubeColorBlue", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 1 })
+    INP["InGain"] = self:AddInput("InGain", "InGain", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 1 })
+    INP["InLift"] = self:AddInput("InLift", "InLift", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0 })
+    INP["InGamma"] = self:AddInput("InGamma", "InGamma", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 1 })
+    INP["InContrast"] = self:AddInput("InContrast", "InContrast", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0 })
+    INP["InSat"] = self:AddInput("InSat", "InSat", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 1 })
+    INP["BalR"] = self:AddInput("BalR", "BalR", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 1 })
+    INP["BalG"] = self:AddInput("BalG", "BalG", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 1 })
+    INP["BalB"] = self:AddInput("BalB", "BalB", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 1 })
+    INP["ShiftOn"] = self:AddInput("ShiftOn", "ShiftOn", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0 })
+    INP["HueShift"] = self:AddInput("HueShift", "HueShift", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0 })
+    INP["SatShift"] = self:AddInput("SatShift", "SatShift", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 1 })
+    INP["MonoOn"] = self:AddInput("MonoOn", "MonoOn", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0 })
+    INP["MonoAmount"] = self:AddInput("MonoAmount", "MonoAmount", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 1 })
+    INP["MonoMode"] = self:AddInput("MonoMode", "MonoMode", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0 })
+    INP["MonoColorRed"] = self:AddInput("MonoColorRed", "MonoColorRed", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0.25 })
+    INP["MonoColorGreen"] = self:AddInput("MonoColorGreen", "MonoColorGreen", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 1 })
+    INP["MonoColorBlue"] = self:AddInput("MonoColorBlue", "MonoColorBlue", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0.4 })
+    INP["MonoBoost"] = self:AddInput("MonoBoost", "MonoBoost", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 1.3 })
+    INP["ColorResOn"] = self:AddInput("ColorResOn", "ColorResOn", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0 })
+    INP["ColorLevels"] = self:AddInput("ColorLevels", "ColorLevels", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 16 })
+    INP["BleedOn"] = self:AddInput("BleedOn", "BleedOn", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0 })
+    INP["BleedStrength"] = self:AddInput("BleedStrength", "BleedStrength", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0.7 })
+    INP["BleedBlur"] = self:AddInput("BleedBlur", "BleedBlur", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 8 })
+    INP["BleedShift"] = self:AddInput("BleedShift", "BleedShift", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 2 })
+    INP["OutGain"] = self:AddInput("OutGain", "OutGain", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 1 })
+    INP["OutLift"] = self:AddInput("OutLift", "OutLift", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0 })
+    INP["OutGamma"] = self:AddInput("OutGamma", "OutGamma", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 1 })
+    INP["OutContrast"] = self:AddInput("OutContrast", "OutContrast", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0 })
+    INP["OutSat"] = self:AddInput("OutSat", "OutSat", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 1 })
+    INP["OutClip"] = self:AddInput("OutClip", "OutClip", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0 })
+    INP["FlickOn"] = self:AddInput("FlickOn", "FlickOn", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0 })
+    INP["FlickType"] = self:AddInput("FlickType", "FlickType", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0 })
+    INP["FlickAmount"] = self:AddInput("FlickAmount", "FlickAmount", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0.08 })
+    INP["FlickSpeed"] = self:AddInput("FlickSpeed", "FlickSpeed", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 1 })
+    INP["FlickSmooth"] = self:AddInput("FlickSmooth", "FlickSmooth", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0.5 })
+    INP["FlickR"] = self:AddInput("FlickR", "FlickR", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 1 })
+    INP["FlickG"] = self:AddInput("FlickG", "FlickG", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 1 })
+    INP["FlickB"] = self:AddInput("FlickB", "FlickB", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 1 })
+    INP["BandOn"] = self:AddInput("BandOn", "BandOn", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0 })
+    INP["BandStrength"] = self:AddInput("BandStrength", "BandStrength", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0.25 })
+    INP["BandGamma"] = self:AddInput("BandGamma", "BandGamma", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0 })
+    INP["BandSpeed"] = self:AddInput("BandSpeed", "BandSpeed", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0.3 })
+    INP["BandReverse"] = self:AddInput("BandReverse", "BandReverse", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0 })
+    INP["BandHeight"] = self:AddInput("BandHeight", "BandHeight", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0.3 })
+    INP["BandSoft"] = self:AddInput("BandSoft", "BandSoft", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0.5 })
+    INP["BandDark"] = self:AddInput("BandDark", "BandDark", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0 })
+    INP["NoiseOn"] = self:AddInput("NoiseOn", "NoiseOn", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0 })
+    INP["NoiseAmount"] = self:AddInput("NoiseAmount", "NoiseAmount", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0.12 })
+    INP["NoiseSize"] = self:AddInput("NoiseSize", "NoiseSize", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 400 })
+    INP["NoiseSpeed"] = self:AddInput("NoiseSpeed", "NoiseSpeed", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 5 })
+    INP["NoiseContrast"] = self:AddInput("NoiseContrast", "NoiseContrast", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 2 })
+    INP["ShakeOn"] = self:AddInput("ShakeOn", "ShakeOn", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0 })
+    INP["ShakeBefore"] = self:AddInput("ShakeBefore", "ShakeBefore", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 1 })
+    INP["ShakeX"] = self:AddInput("ShakeX", "ShakeX", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0.002 })
+    INP["ShakeY"] = self:AddInput("ShakeY", "ShakeY", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0.002 })
+    INP["ShakeSpeed"] = self:AddInput("ShakeSpeed", "ShakeSpeed", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 1 })
+    INP["ShakeJitter"] = self:AddInput("ShakeJitter", "ShakeJitter", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0.3 })
+    INP["ShakeEdges"] = self:AddInput("ShakeEdges", "ShakeEdges", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 3 })
+    InStage = self:AddInput("Stage", "Stage", {
+        LINKID_DataType = "Number", INPID_InputControl = "SliderControl",
+        INP_Default = 0, INP_MinScale = 0, INP_MaxScale = 1, INP_Integer = true,
+    })
+    InImage = self:AddInput("Input", "Input", { LINKID_DataType = "Image", LINK_Main = 1 })
+    InOrig = self:AddInput("Original", "Original", { LINKID_DataType = "Image", LINK_Main = 2, INP_Required = false })
+    OutImage = self:AddOutput("Output", "Output", { LINKID_DataType = "Image", LINK_Main = 1 })
+end
+
+local function num(inp, req) local v = inp:GetValue(req); return v and v.Value or 0 end
+
+function Process(req)
+    local src = InImage:GetValue(req)
+    local org = InOrig:GetValue(req) or src
+    local t = req.Time
+    local V = {}
+    for k, inp in pairs(INP) do V[k] = num(inp, req) end
+    local stage = num(InStage, req)
+    local W, H = src.Width, src.Height
+
+    local dst = Image({ IMG_Like = src, IMG_DeferAlloc = true })
+    local node = DVIPComputeNode(req, "CRTKernel", CRTKernel, "CRTParams", CRTParams)
+    if not node then OutImage:Set(req, src) return end
+    local p = node:GetParamBlock(CRTParams)
+    p.w, p.h, p.stage = W, H, stage
+    for k, v in pairs(V) do p[k] = v end
+
+    -- размер ячейки (как CellPx в 1.0)
+    local cell = math.max(2, math.floor(4 * V.PixSize * ((V.PixScaleRes > 0.5) and (H / 1080) or 1) + 0.5))
+    p.cell = cell
+    p.period = (V.ScanLink > 0.5) and cell or V.ScanPeriod
+
+    -- тряска: до пикселей (stage 0) или после (stage 1)
+    local sh = (V.ShakeOn > 0.5) and ((stage < 0.5) == (V.ShakeBefore > 0.5))
+    if sh then
+        local s = V.ShakeSpeed
+        local sx = 0.55*math.sin(t*s*0.211+0.3) + 0.3*math.sin(t*s*0.537+1.7) + 0.15*math.sin(t*s*1.31+4.1)
+        local sy = 0.55*math.sin(t*s*0.173+2.2) + 0.3*math.sin(t*s*0.611+0.4) + 0.15*math.sin(t*s*1.47+3.3)
+        local jx = 2*((math.sin(t*12.9898+1.1)*43758.5453) % 1) - 1
+        local jy = 2*((math.sin(t*78.233+2.3)*43758.5453) % 1) - 1
+        local j = V.ShakeJitter
+        p.shakeU = -V.ShakeX * ((1-j)*sx + j*jx)
+        p.shakeV = -V.ShakeY * ((1-j)*sy + j*jy)
+    else
+        p.shakeU, p.shakeV = 0, 0
+    end
+
+    -- мерцание (одно число на кадр)
+    local fs = V.FlickSpeed
+    local smooth = 0.5 + 0.5*math.sin(t*fs*0.9)*math.sin(t*fs*0.37+1.3)
+    local rnd = (math.sin(math.floor(t*fs)*12.9898+0.7)*43758.5453) % 1
+    p.flickN = V.FlickSmooth*smooth + (1-V.FlickSmooth)*rnd
+
+    -- бегущая полоса
+    local dir = (V.BandReverse > 0.5) and -1 or 1
+    p.bandY = (1 + V.BandHeight) * ((t*V.BandSpeed*dir/24) % 1) - V.BandHeight/2
+    p.seed = math.floor(t * V.NoiseSpeed)
+
+    node:SetParamBlock(p)
+    node:AddSampler("RowSampler", TEX_FILTER_MODE_LINEAR, TEX_ADDRESS_MODE_CLAMP, TEX_NORMALIZED_COORDS_TRUE)
+    node:AddInput("src", src)
+    node:AddInput("org", org)
+    node:AddOutput("dst", dst)
+    local ok = node:RunSession(req)
+    if not ok then
+        dump(node:GetErrorLog())
+        OutImage:Set(req, src)
+        return
+    end
+    OutImage:Set(req, dst)
+end
