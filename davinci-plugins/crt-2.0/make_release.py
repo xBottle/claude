@@ -50,14 +50,15 @@ DEMO_TOOLS = """
 						UseFrameFormatSettings = Input { Value = 1, },
 						Width = Input { Value = 1920, },
 						Height = Input { Value = 1080, },
-						StyledText = Input { Value = "CRT PRO DEMO", },
+						StyledText = Input { Value = "STORYVERSE-CORE-CRT-PRO.DEMO", },
 						Font = Input { Value = "Open Sans", },
 						Style = Input { Value = "Bold", },
-						Size = Input { Value = 0.14, },
+						Size = Input { Value = 0.035, },
+						Center = Input { Value = { 0.5, 0.07 }, },
 						Red1 = Input { Value = 1, },
 						Green1 = Input { Value = 1, },
 						Blue1 = Input { Value = 1, },
-						Alpha1 = Input { Value = 0.4, },
+						Alpha1 = Input { Value = 0.55, },
 					},
 					ViewInfo = OperatorInfo { Pos = { -795, 80 } },
 				},
@@ -73,7 +74,7 @@ DEMO_TOOLS = """
 
 
 def add_demo_mark(st):
-    """Крупная надпись CRT PRO DEMO штатными нодами Text+ и Merge поверх результата."""
+    """Одна надпись внизу по центру штатными нодами Text+ и Merge поверх результата."""
     out = 'MainOutput1 = InstanceOutput {\n\t\t\t\t\tSourceOp = "FinalMix",'
     end = "\t\t\t},\n\t\t},\n\t},\n\tActiveTool"
     assert out in st and st.count(end) == 1
@@ -303,13 +304,12 @@ def build_edition(name, demo):
     if demo:
         assert "DEMO_BUILD = false" in fuse
         # своё имя ноды и ядра: полная версия не перезапишет демо, Resolve не возьмёт ядро из кэша
-        fuse = (fuse.replace("DEMO_BUILD = false", "DEMO_BUILD = true")
-                    .replace("p.demo = DEMO_BUILD and 1 or 0", "p.demo = 1")
+        fuse = (fuse.replace("p.demo = DEMO_BUILD and 1 or 0", "p.demo = 0")
                     .replace('FuRegisterClass("CRTCore"', 'FuRegisterClass("CRTCoreDemo"')
                     .replace('REGS_Name = "CRT Core"', 'REGS_Name = "CRT Core Demo"')
                     .replace('"CRTKernel"', '"CRTKernelDemo"')
                     .replace("void CRTKernel(", "void CRTKernelDemo("))
-        assert "CRTCoreDemo" in fuse and "CRTKernelDemo" in fuse and "p.demo = 1" in fuse
+        assert "CRTCoreDemo" in fuse and "CRTKernelDemo" in fuse and "p.demo = 0" in fuse
     with open(os.path.join(P, "Fuses", "CRTCoreDemo.fuse" if demo else "CRTCore.fuse"), "w", encoding="utf-8") as f:
         f.write(fuse)
     if not demo:
