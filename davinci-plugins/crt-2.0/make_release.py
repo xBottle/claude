@@ -203,6 +203,7 @@ def make_store(m):
     pat.save(os.path.join(st, "Узоры пикселей.png"))
     cover = make_cover()
     cover.save(os.path.join(st, "Обложка.png"))
+    shutil.copy2(os.path.join(HERE, "store_assets", "Страница товара.md"), os.path.join(st, "Страница товара.md"))
     with open(os.path.join(st, "Описание товара.txt"), "w", encoding="utf-8") as f:
         f.write(STORE_TEXT)
 
