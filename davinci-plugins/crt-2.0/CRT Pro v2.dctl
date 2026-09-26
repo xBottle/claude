@@ -1,0 +1,113 @@
+// CRT Pro v2 — версия для страницы Color (DCTL, GPU).
+// Установка: файл в папку LUT Resolve (см. README), затем на ноде Color:
+// Эффекты → DCTL → выбрать «CRT Pro v2».
+// Здесь всё в один проход: узор пикселей, строки, сведение, выпуклость,
+// углы, виньетка, глубина цвета, монохром. Свечение — штатным Glow на
+// соседней ноде (в DCTL нет многопроходного размытия).
+
+DEFINE_UI_PARAMS(PixPattern, Узор, DCTLUI_COMBO_BOX, 0, { P0, P1, P2, P3, P4, P5, P6, P7, P8, P9 }, { Прямые, Со сдвигом, Апертурная решётка, Щелевая маска, Теневая маска, LCD-сетка, LED-стена, Точечная матрица, Сетка без цвета, Только строки })
+DEFINE_UI_PARAMS(RGBMode, Режим RGB, DCTLUI_COMBO_BOX, 0, { M0, M1, M2 }, { Настоящий RGB, Имитация без цвета, Разделение RGB })
+DEFINE_UI_PARAMS(PixSize, Размер пикселя, DCTLUI_SLIDER_FLOAT, 1.0, 0.25, 8.0, 0.01)
+DEFINE_UI_PARAMS(PixDown, Понижать разрешение, DCTLUI_CHECK_BOX, 1)
+DEFINE_UI_PARAMS(PixStrength, Сила маски, DCTLUI_SLIDER_FLOAT, 1.0, 0.0, 1.0, 0.01)
+DEFINE_UI_PARAMS(PixSoft, Мягкость пикселя, DCTLUI_SLIDER_FLOAT, 0.2, 0.0, 1.0, 0.01)
+DEFINE_UI_PARAMS(PixBright, Усиление яркости, DCTLUI_SLIDER_FLOAT, 2.0, 0.0, 4.0, 0.01)
+DEFINE_UI_PARAMS(PixGamma, Гамма пикселей, DCTLUI_SLIDER_FLOAT, 0.635, 0.2, 2.0, 0.01)
+DEFINE_UI_PARAMS(ScanStrength, Строки сила, DCTLUI_SLIDER_FLOAT, 0.0, 0.0, 1.0, 0.01)
+DEFINE_UI_PARAMS(ScanBeam, Строки толщина луча, DCTLUI_SLIDER_FLOAT, 0.6, 0.05, 1.0, 0.01)
+DEFINE_UI_PARAMS(ConvX, Сведение сдвиг RB, DCTLUI_SLIDER_FLOAT, 0.0, -10.0, 10.0, 0.1)
+DEFINE_UI_PARAMS(Curve, Выпуклость экрана, DCTLUI_SLIDER_FLOAT, 0.0, -0.6, 0.6, 0.01)
+DEFINE_UI_PARAMS(Corner, Скруглённые углы, DCTLUI_SLIDER_FLOAT, 0.0, 0.0, 0.5, 0.005)
+DEFINE_UI_PARAMS(Vig, Виньетка, DCTLUI_SLIDER_FLOAT, 0.0, 0.0, 1.0, 0.01)
+DEFINE_UI_PARAMS(Levels, Уровней цвета 0 выкл, DCTLUI_SLIDER_INT, 0, 0, 64, 1)
+DEFINE_UI_PARAMS(Mono, Монохром 0 выкл, DCTLUI_SLIDER_FLOAT, 0.0, 0.0, 1.0, 0.01)
+DEFINE_UI_PARAMS(MonoR, Монохром R, DCTLUI_SLIDER_FLOAT, 0.25, 0.0, 1.0, 0.01)
+DEFINE_UI_PARAMS(MonoG, Монохром G, DCTLUI_SLIDER_FLOAT, 1.0, 0.0, 1.0, 0.01)
+DEFINE_UI_PARAMS(MonoB, Монохром B, DCTLUI_SLIDER_FLOAT, 0.4, 0.0, 1.0, 0.01)
+
+__DEVICE__ float cl01(float v) { return _fminf(_fmaxf(v, 0.0f), 1.0f); }
+__DEVICE__ float fract1(float v) { return v - _floor(v); }
+__DEVICE__ float sstep(float a, float b, float v) { float t = cl01((v - a) / _fmaxf(b - a, 1e-5f)); return t * t * (3.0f - 2.0f * t); }
+__DEVICE__ float band1(float t, float a, float b, float s) { return sstep(a - s, a + s, t) * (1.0f - sstep(b - s, b + s, t)); }
+__DEVICE__ float dot1(float dx, float dy, float r, float s) { return 1.0f - sstep(r - s, r + s, _sqrtf(dx * dx + dy * dy)); }
+__DEVICE__ float gam(float v, float g) { return v > 0.0f ? _powf(v, 1.0f / _fmaxf(g, 0.01f)) : v; }
+
+__DEVICE__ float3 transform(int p_Width, int p_Height, int p_X, int p_Y, __TEXTURE__ p_TexR, __TEXTURE__ p_TexG, __TEXTURE__ p_TexB)
+{
+    float W = (float)p_Width, H = (float)p_Height;
+    float u = ((float)p_X + 0.5f) / W, v = ((float)p_Y + 0.5f) / H;
+    if (Curve != 0.0f) {
+        float X = (u - 0.5f) * 2.0f * W / H, Y = (v - 0.5f) * 2.0f;
+        float sc = 1.0f + Curve * (X * X + Y * Y);
+        u = 0.5f + (u - 0.5f) * sc; v = 0.5f + (v - 0.5f) * sc;
+    }
+    if (u < 0.0f || u > 1.0f || v < 0.0f || v > 1.0f) return make_float3(0.0f, 0.0f, 0.0f);
+    float fx = u * W, fy = v * H;
+    float S = _fmaxf(1.5f, 4.0f * PixSize * H / 1080.0f);
+    float split = (RGBMode == M2) ? S / 3.0f : 0.0f;
+    float rx = fx - split - ConvX, bx = fx + split + ConvX, gx = fx, sy = fy;
+    if (PixDown) {
+        rx = (_floor(rx / S) + 0.5f) * S; gx = (_floor(gx / S) + 0.5f) * S;
+        bx = (_floor(bx / S) + 0.5f) * S; sy = (_floor(sy / S) + 0.5f) * S;
+    }
+    int iy = (int)_fminf(_fmaxf(sy, 0.0f), H - 1.0f);
+    float r = _tex2D(p_TexR, (int)_fminf(_fmaxf(rx, 0.0f), W - 1.0f), iy);
+    float g = _tex2D(p_TexG, (int)_fminf(_fmaxf(gx, 0.0f), W - 1.0f), iy);
+    float b = _tex2D(p_TexB, (int)_fminf(_fmaxf(bx, 0.0f), W - 1.0f), iy);
+
+    if (Mono > 0.0f) {
+        float L = 0.2126f * r + 0.7152f * g + 0.0722f * b;
+        r += (L * MonoR * 1.3f - r) * Mono; g += (L * MonoG * 1.3f - g) * Mono; b += (L * MonoB * 1.3f - b) * Mono;
+    }
+
+    /* узор пикселей: ячейка = R | G | B | зазор */
+    float cx = fx / S, cy = fy / S, col = _floor(cx);
+    float ux = fract1(cx), uy = fract1(cy);
+    float sft = 0.02f + PixSoft * 0.25f;
+    int k = (int)_floor(ux * 4.0f);
+    float sx = fract1(ux * 4.0f);
+    float stripe = band1(sx, 0.0f, 1.0f, sft);
+    float mr = 0.0f, mg = 0.0f, mb = 0.0f, m = 0.0f;
+    if (PixPattern == P0) m = stripe * band1(uy, 0.0f, 0.75f, sft);
+    else if (PixPattern == P1) m = stripe * band1(fract1(cy + (fract1(col * 0.5f) > 0.25f ? 0.5f : 0.0f)), 0.0f, 0.75f, sft);
+    else if (PixPattern == P2) m = stripe;
+    else if (PixPattern == P3) m = stripe * band1(fract1(cy * 0.5f + (fract1(col * 0.5f) > 0.25f ? 0.5f : 0.0f)), 0.04f, 0.88f, sft * 0.5f);
+    else if (PixPattern == P4) {
+        float ox = fract1(col * 0.5f) > 0.25f ? 1.5f : 0.0f;
+        float tx = fx / (S / 3.0f) + ox, ty = fy / (S * 0.5f);
+        k = ((int)_floor(tx)) % 3; m = dot1(fract1(tx) - 0.5f, fract1(ty) - 0.5f, 0.42f, sft);
+    }
+    else if (PixPattern == P5) m = stripe * band1(uy, 0.08f, 0.92f, sft);
+    else if (PixPattern == P6) m = dot1(sx - 0.5f, (uy - 0.5f) * 1.5f, 0.32f, sft);
+    if (PixPattern == P7) { mr = mg = mb = dot1(ux - 0.5f, uy - 0.5f, 0.3f, sft); }
+    else if (PixPattern == P8) { mr = mg = mb = band1(ux, 0.12f, 1.0f, sft) * band1(uy, 0.12f, 1.0f, sft); }
+    else if (PixPattern == P9) { mr = mg = mb = band1(uy, 0.2f, 0.95f, sft); }
+    else {
+        mr = k == 0 ? m : 0.0f; mg = k == 1 ? m : 0.0f; mb = k == 2 ? m : 0.0f;
+        if (PixPattern == P5) { mr = 0.25f + 0.75f * mr; mg = 0.25f + 0.75f * mg; mb = 0.25f + 0.75f * mb; }
+    }
+    if (RGBMode == M1) { float mm = _fmaxf(mr, _fmaxf(mg, mb)); mr = mg = mb = mm; }
+    float gain = 1.0f + PixStrength * (PixBright - 1.0f);
+    r = gam((r + (r * mr - r) * PixStrength) * gain, PixGamma);
+    g = gam((g + (g * mg - g) * PixStrength) * gain, PixGamma);
+    b = gam((b + (b * mb - b) * PixStrength) * gain, PixGamma);
+
+    if (ScanStrength > 0.0f) {
+        float d = _fabs(fract1(fy / S) - 0.5f) * 2.0f;
+        float line = 1.0f - sstep(ScanBeam - 0.1f, ScanBeam + 0.1f, d);
+        float mm = 1.0f + (line - 1.0f) * ScanStrength; r *= mm; g *= mm; b *= mm;
+    }
+    if (Levels > 1) { float L = (float)Levels; r = _floor(r * L + 0.5f) / L; g = _floor(g * L + 0.5f) / L; b = _floor(b * L + 0.5f) / L; }
+    if (Vig > 0.0f) {
+        float X = (u - 0.5f) / 0.625f, Y = (v - 0.5f) / 0.625f;
+        float mm = 1.0f - Vig * sstep(0.5f, 1.25f, _sqrtf(X * X + Y * Y)); r *= mm; g *= mm; b *= mm;
+    }
+    if (Corner > 0.0f) {
+        float asp = W / H, hx = 0.485f * asp, hy = 0.5f - 0.015f * asp, rad = Corner * asp;
+        float qx = _fabs((u - 0.5f) * asp) - (hx - rad), qy = _fabs(v - 0.5f) - (hy - rad);
+        float ox = _fmaxf(qx, 0.0f), oy = _fmaxf(qy, 0.0f);
+        float d = _sqrtf(ox * ox + oy * oy) + _fminf(_fmaxf(qx, qy), 0.0f) - rad;
+        float mm = 1.0f - sstep(-0.004f, 0.004f, d); r *= mm; g *= mm; b *= mm;
+    }
+    return make_float3(r, g, b);
+}

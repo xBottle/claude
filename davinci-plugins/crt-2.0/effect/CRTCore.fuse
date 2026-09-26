@@ -23,6 +23,7 @@ FuRegisterClass("CRTCore", CT_Tool, {
 CRTParams = [[
     float w; float h; float cell; float stage;
     float GlobalMix;
+    float PerfOn;
     float PixOn;
     float PixPattern;
     float RGBMode;
@@ -380,6 +381,7 @@ __KERNEL__ void CRTKernel(__CONSTANTREF__ CRTParams *p, __TEXTURE2D__ src, __TEX
 function Create()
     INP = {}
     INP["GlobalMix"] = self:AddInput("GlobalMix", "GlobalMix", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 1 })
+    INP["PerfOn"] = self:AddInput("PerfOn", "PerfOn", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0 })
     INP["PixOn"] = self:AddInput("PixOn", "PixOn", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 1 })
     INP["PixPattern"] = self:AddInput("PixPattern", "PixPattern", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0 })
     INP["RGBMode"] = self:AddInput("RGBMode", "RGBMode", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0 })
@@ -509,7 +511,8 @@ function Process(req)
     for k, v in pairs(V) do p[k] = v end
 
     -- размер ячейки (как CellPx в 1.0)
-    local cell = math.max(2, math.floor(4 * V.PixSize * ((V.PixScaleRes > 0.5) and (H / 1080) or 1) + 0.5))
+    -- плавный размер (без округления до целых): «Dynamic Pixel Resizing»
+    local cell = math.max(1.5, 4 * V.PixSize * ((V.PixScaleRes > 0.5) and (H / 1080) or 1))
     p.cell = cell
     p.period = (V.ScanLink > 0.5) and cell or V.ScanPeriod
 
@@ -544,7 +547,13 @@ function Process(req)
     node:AddInput("src", src)
     node:AddInput("org", org)
     node:AddOutput("dst", dst)
+    local t0 = os.clock()
     local ok = node:RunSession(req)
+    if (V.PerfOn or 0) > 0.5 then
+        local ms = (os.clock() - t0) * 1000
+        print(string.format("[CRT Core] проход %d: %.2f мс (%dx%d) ≈ %.0f fps только на этот проход",
+            stage, ms, W, H, ms > 0 and 1000 / ms or 0))
+    end
     if not ok then
         dump(node:GetErrorLog())
         OutImage:Set(req, src)

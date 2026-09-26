@@ -6,11 +6,13 @@ mkdir -p "$FU/Templates/Edit/Effects/Claude/CRT" "$FU/Scripts/Comp/crt-2.0/icons
 rm -f "$FU/Templates/Edit/Effects/Claude/CRT/CRT Pro 2.0."*
 cp "effect/CRT Pro v2.setting" "effect/CRT Pro v2.png" "$FU/Templates/Edit/Effects/Claude/CRT/"
 cp "effect/CRTCore.fuse" "$FU/Fuses/"
+LUT="$HOME/Library/Application Support/Blackmagic Design/DaVinci Resolve/LUT"
+mkdir -p "$LUT/Claude" && cp "CRT Pro v2.dctl" "$LUT/Claude/"
 cp "CRT Presets.lua" crt_pro_data.lua "$FU/Scripts/Comp/crt-2.0/"
 cp icons/*.png "$FU/Scripts/Comp/crt-2.0/icons/"
 rm -f "$FU/Scripts/Comp/crt-2.0/CRT 2.0.lua" "$FU/Scripts/Comp/crt-2.0/CRT Pro Panel.lua"
 echo "Установлено:"
-ls "$FU/Templates/Edit/Effects/Claude/CRT/" "$FU/Fuses/CRTCore.fuse"
+ls "$FU/Templates/Edit/Effects/Claude/CRT/" "$FU/Fuses/CRTCore.fuse" "$LUT/Claude/"
 echo
 echo "Перезапусти Resolve (Cmd+Q) и перетащи «CRT Pro v2» на клип."
 read -n 1 -s -r -p "Нажми любую клавишу..."

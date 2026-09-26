@@ -306,7 +306,8 @@ __READ_INPUTS__
     for k, v in pairs(V) do p[k] = v end
 
     -- размер ячейки (как CellPx в 1.0)
-    local cell = math.max(2, math.floor(4 * V.PixSize * ((V.PixScaleRes > 0.5) and (H / 1080) or 1) + 0.5))
+    -- плавный размер (без округления до целых): «Dynamic Pixel Resizing»
+    local cell = math.max(1.5, 4 * V.PixSize * ((V.PixScaleRes > 0.5) and (H / 1080) or 1))
     p.cell = cell
     p.period = (V.ScanLink > 0.5) and cell or V.ScanPeriod
 
@@ -341,7 +342,13 @@ __READ_INPUTS__
     node:AddInput("src", src)
     node:AddInput("org", org)
     node:AddOutput("dst", dst)
+    local t0 = os.clock()
     local ok = node:RunSession(req)
+    if (V.PerfOn or 0) > 0.5 then
+        local ms = (os.clock() - t0) * 1000
+        print(string.format("[CRT Core] проход %d: %.2f мс (%dx%d) ≈ %.0f fps только на этот проход",
+            stage, ms, W, H, ms > 0 and 1000 / ms or 0))
+    end
     if not ok then
         dump(node:GetErrorLog())
         OutImage:Set(req, src)
