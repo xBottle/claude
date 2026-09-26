@@ -38,19 +38,19 @@ print("входов группы: " .. nin)
 local labels = 0
 for i, k in ipairs(order) do
   local uc = ucs[grp.Inputs[k].Source]
-  if uc and uc.INPID_InputControl == "LabelControl" then
+  if uc and uc.INPID_InputControl == "LabelControl" and uc.LBLC_DropDownButton then
     labels = labels + 1
     local n = uc.LBLC_NumInputs
     for j = i + 1, i + n do
       local kk = order[j]
       if not kk then bad("раздел " .. k .. " выходит за конец списка"); break end
       local u2 = ucs[grp.Inputs[kk].Source]
-      if u2 and u2.INPID_InputControl == "LabelControl" then bad("раздел " .. k .. " захватывает раздел " .. kk) end
+      if u2 and u2.INPID_InputControl == "LabelControl" and u2.LBLC_DropDownButton then bad("раздел " .. k .. " захватывает раздел " .. kk) end
     end
     local nxt = order[i + n + 1]
     if nxt then
       local u3 = ucs[grp.Inputs[nxt].Source]
-      if not (u3 and u3.INPID_InputControl == "LabelControl") then bad("после раздела " .. k .. " остался контрол вне раздела: " .. nxt) end
+      if not (u3 and u3.INPID_InputControl == "LabelControl" and u3.LBLC_DropDownButton) then bad("после раздела " .. k .. " остался контрол вне раздела: " .. nxt) end
     end
   end
 end

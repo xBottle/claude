@@ -149,16 +149,8 @@ local MARK_DIR = (os.getenv("TMPDIR") or "/tmp/") .. "/"
 local OPEN_MARK, CLOSE_MARK = MARK_DIR .. "crtpro_presets.open", MARK_DIR .. "crtpro_presets.close"
 local function exists(f) local h = io.open(f, "r"); if h then h:close() return true end return false end
 local function touch(f) local h = io.open(f, "w"); if h then h:write(tostring(os.time())); h:close() end end
-if exists(OPEN_MARK) then
-    -- окно уже открыто: просим его закрыться и выходим (второе нажатие = закрыть)
-    touch(CLOSE_MARK)
-    os.remove(OPEN_MARK)
-    local w; pcall(function() w = ui:FindWindow("CRTPresetsWin") end)
-    if w then pcall(function() w:Hide() end) end
-    return
-end
+-- (переключатель «открыть/закрыть» убран: Resolve запускает каждое нажатие отдельно)
 os.remove(CLOSE_MARK)
-touch(OPEN_MARK)
 local disp = bmd.UIDispatcher(ui)
 local tunpack = table.unpack or unpack
 
@@ -173,7 +165,7 @@ pcall(syncTemplate)
 local selected = nil     -- { kind = "builtin"/"own", index = i, name = "..." }
 local statusText = ""
 local reopen = true
-local geom = { 200, 80, 590, 760 }
+local geom = { 200, 60, 640, 820 }
 
 while reopen do
     reopen = false
@@ -198,7 +190,7 @@ QPushButton:hover { border:1px solid #6d5dfc; background:#1b1c24; }]]
     local BLUE, WHITE, GREEN, RED = "#9d8cff", "#e6e7ee", "#5eead4", "#fb7185"
 
     local rows = {}
-    local COLS = 4
+    local COLS = 5
     local function iconFor(it)
         if it.thumb and bmd.fileexists(it.thumb) then
             local ok, ic = pcall(function() return ui:Icon{ File = it.thumb } end)
@@ -216,7 +208,7 @@ QPushButton:hover { border:1px solid #6d5dfc; background:#1b1c24; }]]
                 ui:Button{
                     ID = "card_" .. c, Text = "",
                     Icon = iconFor(it),
-                    IconSize = { 120, 67 }, MinimumSize = { 128, 74 }, MaximumSize = { 128, 74 },
+                    IconSize = { 104, 58 }, MinimumSize = { 112, 64 }, MaximumSize = { 112, 64 },
                     ToolTip = it.name, StyleSheet = isSel and CARD_SEL or CARD,
                 },
                 ui:Label{
@@ -225,7 +217,7 @@ QPushButton:hover { border:1px solid #6d5dfc; background:#1b1c24; }]]
                 },
             }
         end
-        while #cells < COLS do cells[#cells + 1] = ui:HGap(128) end
+        while #cells < COLS do cells[#cells + 1] = ui:HGap(112) end
         rows[#rows + 1] = ui:HGroup{ Weight = 0, Spacing = 8, tunpack(cells) }
     end
 

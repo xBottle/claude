@@ -6,8 +6,8 @@ DEFINE_UI_PARAMS(PixSize, Pixel Size, DCTLUI_SLIDER_FLOAT, 1.0, 0.25, 8.0, 0.01)
 DEFINE_UI_PARAMS(PixDown, Downscale, DCTLUI_CHECK_BOX, 1)
 DEFINE_UI_PARAMS(PixStrength, Mask Strength, DCTLUI_SLIDER_FLOAT, 1.0, 0.0, 1.0, 0.01)
 DEFINE_UI_PARAMS(PixSoft, Pixel Softness, DCTLUI_SLIDER_FLOAT, 0.2, 0.0, 1.0, 0.01)
-DEFINE_UI_PARAMS(PixBright, Brightness Boost, DCTLUI_SLIDER_FLOAT, 2.0, 0.0, 4.0, 0.01)
-DEFINE_UI_PARAMS(PixGamma, Pixel Gamma, DCTLUI_SLIDER_FLOAT, 0.635, 0.2, 2.0, 0.01)
+DEFINE_UI_PARAMS(PixBright, Brightness Boost, DCTLUI_SLIDER_FLOAT, 3.2, 0.0, 6.0, 0.01)
+DEFINE_UI_PARAMS(PixGamma, Pixel Gamma, DCTLUI_SLIDER_FLOAT, 0.9, 0.2, 2.0, 0.01)
 DEFINE_UI_PARAMS(ScanStrength, Scanlines, DCTLUI_SLIDER_FLOAT, 0.0, 0.0, 1.0, 0.01)
 DEFINE_UI_PARAMS(ScanBeam, Beam Width, DCTLUI_SLIDER_FLOAT, 0.6, 0.05, 1.0, 0.01)
 DEFINE_UI_PARAMS(ConvX, Convergence, DCTLUI_SLIDER_FLOAT, 0.0, -10.0, 10.0, 0.1)
@@ -38,7 +38,7 @@ __DEVICE__ float3 transform(int p_Width, int p_Height, int p_X, int p_Y, __TEXTU
     }
     if (u < 0.0f || u > 1.0f || v < 0.0f || v > 1.0f) return make_float3(0.0f, 0.0f, 0.0f);
     float fx = u * W, fy = v * H;
-    float S = _fmaxf(1.5f, 4.0f * PixSize * H / 1080.0f);
+    float S = _fmaxf(2.0f, _floor(4.0f * PixSize * H / 1080.0f + 0.5f));  /* integer size = no banding */
     float split = (RGBMode == M2) ? S / 3.0f : 0.0f;
     float rx = fx - split - ConvX, bx = fx + split + ConvX, gx = fx, sy = fy;
     if (PixDown) {
