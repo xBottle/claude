@@ -17,7 +17,7 @@ DIST = os.path.join(HERE, "dist")
 DEMO_PRESETS = (0, 1, 3)       # пресеты демо: по умолчанию, классический ТВ, зелёный терминал
 DEMO_KEEP = ("PresetSel", "BtnApply", "PixSize", "PixBright", "PixGamma")
 # Публичные пути (не пересекаются с CRT Pro 1.0 в Claude/CRT)
-CAT, SCR, LUTD = "STORYVERSE", "crt-pro", "STORYVERSE"
+CAT, SCR, LUTD = "STORYVERSE/CRT", "crt-pro", "STORYVERSE"
 
 
 def load_builder(demo=False):
@@ -163,7 +163,7 @@ README = '''@UNAME@ — процедурный CRT-эффект для DaVinci R
   После установки перезапустите DaVinci Resolve.
 
 ГДЕ НАЙТИ
-  Edit / Cut : Effects → Эффекты → @CAT@ → «@NAME@»
+  Edit / Cut : Effects → Эффекты → STORYVERSE → CRT → «@NAME@»
   Fusion     : Shift+Пробел → «CRT Core»
   Color      : Effects → DCTL → в списке DCTL выбрать @LUT@ / @NAME@
 
@@ -300,7 +300,7 @@ def build_edition(name, demo):
         st = publicize(m.build_setting(0), name)
         f.write(add_demo_mark(st.replace("Fuse.CRTCore", "Fuse.CRTCoreDemo")) if demo else st)
     shutil.copy2(os.path.join(HERE, "effect", SRC + ".png"), os.path.join(P, "Effect", name + ".png"))
-    fuse = publicize(strip_lua_comments(m.build_fuse()), "CRT Pro").replace('REGS_Category = "Claude"', 'REGS_Category = "STORYVERSE"')
+    fuse = publicize(strip_lua_comments(m.build_fuse()), "CRT Pro").replace('REGS_Category = "Claude"', 'REGS_Category = "STORYVERSE\\\\CRT"')
     if demo:
         assert "DEMO_BUILD = false" in fuse
         # своё имя ноды и ядра: полная версия не перезапишет демо, Resolve не возьмёт ядро из кэша
@@ -332,7 +332,7 @@ def build_edition(name, demo):
 
     readme = fill(README, name, demo) + (DEMO_NOTE if demo else "")
     files = {"Установить (macOS).command": fill(MAC, name, demo),
-             "Установить (Windows).bat": fill(WIN, name, demo).replace("\n", "\r\n"),
+             "Установить (Windows).bat": fill(WIN, name, demo).replace(CAT, CAT.replace("/", "\\")).replace("\n", "\r\n"),
              "install-linux.sh": fill(LINUX, name, demo), "README.txt": readme,
              "LICENSE.txt": fill(LICENSE, name, demo)}
     for fn, txt in files.items():
