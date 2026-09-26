@@ -202,27 +202,28 @@ QPushButton:hover { border:1px solid #6d5dfc; background:#1b1c24; }]]
     end
     local pages = math.max(1, math.ceil(#items / PER_PAGE))
     if page > pages then page = pages end
-    local first, last = (page - 1) * PER_PAGE + 1, math.min(page * PER_PAGE, #items)
-    for r = first, last, COLS do
+    -- 15 постоянных ячеек: при листании меняется только их содержимое (окно не пересоздаётся)
+    local CARD_EMPTY = [[QPushButton { background:transparent; border:1px dashed #1c1d24; border-radius:12px; }]]
+    local function isSelected(it) return it and selected and selected.name == it.name and selected.kind == it.kind end
+    local function itemAt(k) return items[(page - 1) * PER_PAGE + k] end
+    for r = 1, PER_PAGE, COLS do
         local cells = {}
-        for c = r, math.min(r + COLS - 1, last) do
-            local it = items[c]
-            local isSel = selected and selected.name == it.name and selected.kind == it.kind
+        for k = r, r + COLS - 1 do
+            local it = itemAt(k)
             cells[#cells + 1] = ui:VGroup{
                 Weight = 1, Spacing = 2,
                 ui:Button{
-                    ID = "card_" .. c, Text = "",
-                    Icon = iconFor(it),
+                    ID = "card_" .. k, Text = "", Icon = it and iconFor(it) or nil,
                     IconSize = { 104, 58 }, MinimumSize = { 112, 64 }, MaximumSize = { 112, 64 },
-                    ToolTip = it.name, StyleSheet = isSel and CARD_SEL or CARD,
+                    ToolTip = it and it.name or "", StyleSheet = it and (isSelected(it) and CARD_SEL or CARD) or CARD_EMPTY,
                 },
                 ui:Label{
-                    Text = (it.kind == "own" and "★ " or "") .. it.name, Alignment = { AlignHCenter = true },
+                    ID = "cardlbl_" .. k, Alignment = { AlignHCenter = true },
+                    Text = it and ((it.kind == "own" and "★ " or "") .. it.name) or "",
                     StyleSheet = "color:#b9bbc7; font-size:11px;", WordWrap = true,
                 },
             }
         end
-        while #cells < COLS do cells[#cells + 1] = ui:HGap(112) end
         rows[#rows + 1] = ui:HGroup{ Weight = 0, Spacing = 8, tunpack(cells) }
     end
 
@@ -259,7 +260,7 @@ QLineEdit:focus { border:1px solid #8b7bff; }]],
             ui:VGroup{ Weight = 0, Spacing = 6, tunpack(rows) },
             ui:HGroup{ Weight = 0,
                 ui:Button{ ID = "PgPrev", Text = "◀", MaximumSize = { 60, 34 }, StyleSheet = btnStyle(WHITE) },
-                ui:Label{ Text = string.format("%d / %d   ·   %d пресетов", page, pages, #items),
+                ui:Label{ ID = "PgLabel", Text = string.format("%d / %d   ·   %d пресетов", page, pages, #items),
                     Alignment = { AlignHCenter = true, AlignVCenter = true }, StyleSheet = "color:#8a8c99;" },
                 ui:Button{ ID = "PgNext", Text = "▶", MaximumSize = { 60, 34 }, StyleSheet = btnStyle(WHITE) },
             },
@@ -311,12 +312,47 @@ QLineEdit:focus { border:1px solid #8b7bff; }]],
     end
 
     -- клик по карточке: выбрать и сразу применить
-    function win.On.PgPrev.Clicked() if page > 1 then page = page - 1; restart() end end
-    function win.On.PgNext.Clicked() if page < pages then page = page + 1; restart() end end
-    for c = first, last do
-        local it = items[c]
-        win.On["card_" .. c].Clicked = function()
-            for c2 = first, last do pcall(function() itm["card_" .. c2].StyleSheet = (c2 == c) and CARD_SEL or CARD end) end
+    -- обновить одну ячейку под текущую страницу
+    local function fillSlot(k)
+        local it = itemAt(k)
+        pcall(function()
+            itm["card_" .. k].Icon = it and iconFor(it) or ui:Icon{}
+            itm["card_" .. k].ToolTip = it and it.name or ""
+            itm["card_" .. k].StyleSheet = it and (isSelected(it) and CARD_SEL or CARD) or CARD_EMPTY
+            itm["card_" .. k].Enabled = it ~= nil
+            itm["cardlbl_" .. k].Text = it and ((it.kind == "own" and "★ " or "") .. it.name) or ""
+        end)
+    end
+    -- «волна»: карточки обновляются по очереди с шагом ~25 мс; без таймера — сразу все
+    local waveK, waveTimer = 0, nil
+    pcall(function() waveTimer = ui:Timer{ ID = "WaveTimer", Interval = 25 } end)
+    local function waveStep()
+        waveK = waveK + 1
+        if waveK > PER_PAGE then pcall(function() waveTimer:Stop() end) return end
+        fillSlot(waveK)
+    end
+    local function showPage(np)
+        if np < 1 or np > pages or np == page then return end
+        page = np
+        pcall(function() itm.PgLabel.Text = string.format("%d / %d   ·   %d пресетов", page, pages, #items) end)
+        for k = 1, PER_PAGE do  -- мгновенно «гасим» старое
+            pcall(function() itm["card_" .. k].StyleSheet = CARD_EMPTY; itm["cardlbl_" .. k].Text = "" end)
+        end
+        local ok = waveTimer and pcall(function()
+            win.On.WaveTimer.Timeout = waveStep
+            waveK = 0; waveTimer:Start()
+        end)
+        if not ok then for k = 1, PER_PAGE do fillSlot(k) end end
+    end
+    function win.On.PgPrev.Clicked() showPage(page - 1) end
+    function win.On.PgNext.Clicked() showPage(page + 1) end
+    for k = 1, PER_PAGE do
+        win.On["card_" .. k].Clicked = function()
+            local it = itemAt(k)
+            if not it then return end
+            for k2 = 1, PER_PAGE do
+                pcall(function() if itemAt(k2) then itm["card_" .. k2].StyleSheet = (k2 == k) and CARD_SEL or CARD end end)
+            end
             selected = it
             itm.NameEdit.Text = it.name
             apply(it)
@@ -337,7 +373,7 @@ QLineEdit:focus { border:1px solid #8b7bff; }]],
         applyTable(builtinValues(0), "сброс")
         pcall(function() tool:SetInput("PresetSel", 0) end)
         selected = nil
-        for c2 = first, last do pcall(function() itm["card_" .. c2].StyleSheet = CARD end) end
+        for k2 = 1, PER_PAGE do pcall(function() if itemAt(k2) then itm["card_" .. k2].StyleSheet = CARD end end) end
         status("Все настройки сброшены к значениям по умолчанию.")
     end
 
@@ -410,20 +446,9 @@ QLineEdit:focus { border:1px solid #8b7bff; }]],
     end
 
     function win.On.CRTPresetsWin.Close() reopen = false; disp:ExitLoop() end
-    local timer
-    pcall(function()
-        timer = ui:Timer{ ID = "CRTCloseTimer", Interval = 300 }
-        local function tick()
-            if exists(CLOSE_MARK) then reopen = false; disp:ExitLoop() end
-        end
-        disp.On.Timeout = tick
-        win.On.CRTCloseTimer.Timeout = tick
-        timer:Start()
-    end)
-
     win:Show()
     disp:RunLoop()
-    if timer then pcall(function() timer:Stop() end) end
+    if waveTimer then pcall(function() waveTimer:Stop() end) end
     win:Hide()
 end
 os.remove(OPEN_MARK)
