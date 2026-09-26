@@ -1,7 +1,6 @@
--- CRT Pro 2.0 — окно пресетов (как у Procedural CRT).
--- Открывается кнопкой «Окно пресетов» в Инспекторе эффекта (страница Edit),
--- либо вручную: Рабочая область → Сценарии → Comp → CRT Presets.
--- Ползунки остаются в обычном Инспекторе, здесь — только пресеты.
+-- CRT Pro v2 — окно пресетов.
+-- Открывается кнопкой «ОКНО ПРЕСЕТОВ» в Инспекторе эффекта (страница Edit).
+-- Список пресетов с превью (прокрутка), узоры пикселей, свои пресеты ★.
 
 local function scriptDir()
     local src = debug.getinfo(1, "S").source
@@ -142,15 +141,6 @@ end
 
 local ui = FUAPP.UIManager
 
--- Переключатель: если окно уже открыто — эта кнопка его закрывает.
-local function getD(k) local ok, v = pcall(function() return FUAPP:GetData(k) end); return ok and v or nil end
-local function setD(k, v) pcall(function() FUAPP:SetData(k, v) end) end
-local MARK_DIR = (os.getenv("TMPDIR") or os.getenv("TEMP") or "/tmp") .. "/"
-local OPEN_MARK, CLOSE_MARK = MARK_DIR .. "crtpro_presets.open", MARK_DIR .. "crtpro_presets.close"
-local function exists(f) local h = io.open(f, "r"); if h then h:close() return true end return false end
-local function touch(f) local h = io.open(f, "w"); if h then h:write(tostring(os.time())); h:close() end end
--- (переключатель «открыть/закрыть» убран: Resolve запускает каждое нажатие отдельно)
-os.remove(CLOSE_MARK)
 local disp = bmd.UIDispatcher(ui)
 local tunpack = table.unpack or unpack
 
@@ -163,8 +153,6 @@ end
 
 pcall(syncTemplate)
 local selected = nil
-local page = 1
-local PER_PAGE = 15     -- { kind = "builtin"/"own", index = i, name = "..." }
 local statusText = ""
 local reopen = true
 local geom = { 200, 60, 620, 860 }
@@ -172,7 +160,7 @@ local geom = { 200, 60, 620, 860 }
 while reopen do
     reopen = false
 
-    -- все карточки: 10 встроенных + свои
+    -- все пресеты: встроенные + свои (★)
     local items = {}
     for i, n in ipairs(DATA.PRESET_NAMES) do
         items[#items + 1] = { kind = "builtin", index = i - 1, name = n, ico = "preset_" .. (i - 1) }
@@ -181,9 +169,6 @@ while reopen do
         items[#items + 1] = { kind = "own", name = n, ico = "preset_own", thumb = PRESET_DIR .. n .. ".png" }
     end
 
-    local CARD = [[QPushButton { background:#16171d; border:1px solid #25262e; border-radius:12px; padding:3px; }
-QPushButton:hover { border:1px solid #6d5dfc; background:#1b1c24; }]]
-    local CARD_SEL = [[QPushButton { background:#1d1a33; border:2px solid #8b7bff; border-radius:12px; padding:2px; }]]
     local function btnStyle(color)
         return "QPushButton { background:#17181f; color:" .. color .. "; border:1px solid #2b2c36; " ..
             "border-radius:10px; padding:9px; font-weight:600; } QPushButton:hover { border-color:" .. color ..
@@ -191,8 +176,6 @@ QPushButton:hover { border:1px solid #6d5dfc; background:#1b1c24; }]]
     end
     local BLUE, WHITE, GREEN, RED = "#9d8cff", "#e6e7ee", "#5eead4", "#fb7185"
 
-    local rows = {}
-    local COLS = 5
     local function iconFor(it)
         if it.thumb and bmd.fileexists(it.thumb) then
             local ok, ic = pcall(function() return ui:Icon{ File = it.thumb } end)
@@ -200,10 +183,7 @@ QPushButton:hover { border:1px solid #6d5dfc; background:#1b1c24; }]]
         end
         return icon(it.ico) or icon("preset_0")
     end
-    local pages = math.max(1, math.ceil(#items / PER_PAGE))
-    if page > pages then page = pages end
-    -- Список-плитка с прокруткой: Tree на 3 колонки, в каждой ячейке превью + подпись.
-    local LCOLS = 3
+    -- список с прокруткой: одна строка = один пресет
     local function label(it) return (it.kind == "own" and "★ " or "") .. it.name end
     local byLabel = {}
     for _, it in ipairs(items) do byLabel[label(it)] = it end
@@ -238,11 +218,11 @@ QLineEdit:focus { border:1px solid #8b7bff; }]],
         ui:VGroup{
             Spacing = 8,
             ui:Label{ Text = "<img src='" .. DIR .. "icons/title.png'>", Alignment = { AlignHCenter = true }, Weight = 0 },
-            ui:Tree{ ID = "PresetList", Weight = 1, MinimumSize = { 560, 330 },
-                IconSize = { 160, 90 }, HeaderHidden = true, RootIsDecorated = false,
-                SelectionMode = "SingleSelection", ColumnCount = LCOLS, UniformRowHeights = true,
+            ui:Tree{ ID = "PresetList", Weight = 1, MinimumSize = { 560, 340 },
+                IconSize = { 128, 72 }, HeaderHidden = true, RootIsDecorated = false,
+                SelectionMode = "SingleSelection", ColumnCount = 1, UniformRowHeights = true,
                 StyleSheet = [[QTreeWidget { background:#0e0f14; border:1px solid #25262e; border-radius:12px; padding:6px; outline:0; }
-QTreeWidget::item { color:#b9bbc7; padding:6px 2px 10px 2px; border-radius:10px; }
+QTreeWidget::item { color:#d6d8e2; font-size:13px; padding:4px 6px; border-radius:10px; }
 QTreeWidget::item:hover { background:#1b1c24; }
 QTreeWidget::item:selected { background:#221d3d; color:#ffffff; }
 QScrollBar:vertical { background:#0e0f14; width:8px; }
@@ -295,28 +275,24 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height:0; }]] },
         disp:ExitLoop()
     end
 
-    -- клик по карточке: выбрать и сразу применить
-    -- заполнить плитку
+    -- заполнить список; клик по строке = выбрать и сразу применить
     pcall(function()
         local tr = itm.PresetList
-        pcall(function() tr:SetIconSize({ 160, 90 }) end)
-        for c = 0, LCOLS - 1 do pcall(function() tr:SetColumnWidth(c, 180) end) end
-        for r = 1, #items, LCOLS do
+        pcall(function() tr:SetIconSize({ 128, 72 }) end)
+        -- одна строка = один пресет: превью слева, название справа
+        for _, it in ipairs(items) do
             local row = tr:NewItem()
-            for c = 0, LCOLS - 1 do
-                local it = items[r + c]
-                if it then
-                    row.Text[c] = label(it)
-                    row.Icon[c] = iconFor(it)
-                    pcall(function() row.TextAlignment[c] = { AlignHCenter = true, AlignBottom = true } end)
-                end
-            end
+            row.Text[0] = "   " .. label(it)
+            row.Icon[0] = iconFor(it)
             tr:AddTopLevelItem(row)
+            if selected and selected.name == it.name and selected.kind == it.kind then
+                pcall(function() row.Selected = true end)
+            end
         end
     end)
     function win.On.PresetList.ItemClicked(ev)
-        local txt = ev.item and ev.item.Text[ev.column or 0]
-        local it = txt and byLabel[txt]
+        local txt = ev.item and ev.item.Text[0]
+        local it = txt and byLabel[(txt:gsub("^%s+", ""))]
         if not it then return end
         selected = it
         itm.NameEdit.Text = it.name
@@ -337,6 +313,8 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height:0; }]] },
         applyTable(builtinValues(0), "сброс")
         pcall(function() tool:SetInput("PresetSel", 0) end)
         selected = nil
+        pcall(function() itm.PresetList:ClearSelection() end)
+        itm.NameEdit.Text = ""
         status("Все настройки сброшены к значениям по умолчанию.")
     end
 
@@ -413,5 +391,3 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height:0; }]] },
     disp:RunLoop()
     win:Hide()
 end
-os.remove(OPEN_MARK)
-os.remove(CLOSE_MARK)

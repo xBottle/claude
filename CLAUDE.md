@@ -14,7 +14,7 @@
 | `crt_pro_data.lua` | данные для окна: `python3 gen_data.py build_crt_pro_2.py` после правок генератора |
 | `CRT Pro v2.dctl` | упрощённая версия для страницы Color (ASCII-подписи, без времени/размытия) |
 | `icons/` | превью пресетов/узоров — рендер реального ядра на CPU (C-копия ядра, см. историю в git) |
-| `make_release.py` | чистый пакет: payload + установщики macOS/Windows/Linux + README/LICENSE |
+| `make_release.py` | чистый пакет: payload + установщики macOS/Windows/Linux + README/LICENSE; `dist/Для магазина/` (обложка из `store_assets/`, сетка пресетов, описание) |
 | `validate_crt_pro.lua` | валидатор (запускается через fuscript на Mac при `--install`) |
 
 Проверки без Resolve: `luac5.1 -p` для Lua/fuse; ядро компилировать gcc с заглушками макросов.

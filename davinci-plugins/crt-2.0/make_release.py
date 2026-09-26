@@ -105,8 +105,8 @@ README = '''CRT PRO v2 — процедурный CRT-эффект для DaVinc
   Color      : Effects → DCTL → в списке DCTL выбрать Claude / CRT Pro v2
 
 КАК ПОЛЬЗОВАТЬСЯ
-  • Вкладка «Управление» → «ОКНО ПРЕСЕТОВ»: 18 пресетов с превью, узоры пикселей,
-    свои пресеты со снимком кадра, листание ◀ ▶.
+  • Вкладка «Управление» → «ОКНО ПРЕСЕТОВ»: 18 пресетов с превью (список с прокруткой),
+    10 узоров пикселей, свои пресеты ★ со снимком кадра, код настроек в буфер/из буфера.
   • Вкладки Пиксели / Экран / Цвет / Помехи — ручная настройка.
   • Эффект считается на видеокарте (≈1–2 мс на кадр 1080p).
   • Не накладывайте эффект одновременно на Edit и на Color — двойная сетка даёт муар.
@@ -122,6 +122,89 @@ LICENSE = '''CRT PRO v2 — ЛИЦЕНЗИЯ
 Запрещено: перепродавать, публиковать или передавать файлы эффекта третьим
 лицам, в том числе в изменённом виде.
 '''
+
+
+STORE_TEXT = """CRT PRO v2 — процедурный CRT для DaVinci Resolve
+====================================================
+
+Настоящие пиксели кинескопа, а не наложенная картинка. Эффект считается
+на видеокарте формулами — ~1 мс на кадр 1080p, реальное время.
+
+ЧТО ВНУТРИ
+• 18 готовых пресетов: от классического ТВ и VHS до неонового клуба и глитч-клипа
+• 10 узоров пикселей: апертурная решётка (Trinitron), щелевая и теневая маски,
+  LCD, LED-стена, точечная матрица и др.
+• Плавный размер пикселя, настоящий / имитационный / разделённый RGB
+• Строки развёртки, сведение лучей, растекание цвета, глубина цвета
+• Выпуклость экрана, скруглённые углы, виньетка, свечение и ореол трубки
+• Послесвечение люминофора (хвосты от движения) и блик на стекле
+• Мерцание, бегущая полоса, живое зерно, тряска
+• Окно пресетов с превью, свои пресеты со снимком кадра, обмен кодом настроек
+• Работает на страницах Edit, Fusion и Color (DCTL, Resolve Studio)
+• Установщики для macOS, Windows и Linux
+
+ТРЕБОВАНИЯ
+DaVinci Resolve 18 и новее (проверено на 20). Страница Color — Resolve Studio.
+"""
+
+
+def make_cover():
+    """Обложка 1920x1080: полноразмерный рендер ядра + крупный заголовок с градиентом."""
+    from PIL import Image, ImageDraw, ImageFont, ImageChops, ImageFilter
+    W, H = 1920, 1080
+    bg = Image.open(os.path.join(HERE, "store_assets", "cover_bg.png")).convert("RGB").resize((W, H), Image.LANCZOS)
+    shade = Image.new("RGB", (W, H), (10, 10, 16))
+    cover = Image.blend(bg, shade, 0.45)
+    bold = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+    reg = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+    f1, f2 = ImageFont.truetype(bold, 230), ImageFont.truetype(reg, 46)
+    mask = Image.new("L", (W, H), 0)
+    ImageDraw.Draw(mask).text((W // 2, H // 2 - 60), "CRT PRO", font=f1, fill=255, anchor="mm")
+    grad = Image.new("RGB", (W, H))
+    gp = grad.load()
+    for x in range(W):
+        t = x / W
+        c = (int(157 * (1 - t) + 34 * t), int(140 * (1 - t) + 211 * t), int(255 * (1 - t) + 238 * t))
+        for y in range(H):
+            gp[x, y] = c
+    glow = Image.new("RGB", (W, H), (0, 0, 0))
+    glow.paste(grad, (0, 0), mask.filter(ImageFilter.GaussianBlur(30)))
+    cover = ImageChops.add(cover, glow.point(lambda v: int(v * 0.6)))
+    for off, col in ((-6, (255, 60, 120)), (6, (40, 220, 255))):
+        cover.paste(Image.new("RGB", (W, H), col), (0, 0), ImageChops.offset(mask, off, 0).point(lambda v: int(v * 0.4)))
+    cover.paste(grad, (0, 0), mask)
+    d = ImageDraw.Draw(cover)
+    d.text((W // 2, H // 2 + 110), "procedural CRT  ·  DaVinci Resolve", font=f2, fill=(230, 231, 238), anchor="mm")
+    d.rounded_rectangle([W // 2 - 190, H // 2 + 170, W // 2 + 190, H // 2 + 240], radius=35,
+                        fill=(29, 26, 51), outline=(139, 123, 255), width=3)
+    d.text((W // 2, H // 2 + 205), "18 PRESETS  ·  GPU", font=ImageFont.truetype(reg, 32), fill=(230, 231, 238), anchor="mm")
+    return cover
+
+
+def make_store(m):
+    """Материалы для страницы товара — отдельно от архива покупателя."""
+    from PIL import Image, ImageDraw
+    st = os.path.join(DIST, "Для магазина")
+    os.makedirs(st, exist_ok=True)
+    icons = os.path.join(HERE, "icons")
+    n = len(m.PRESET_NAMES)
+    cols, w, h = 3, 320, 180
+    rows = (n + cols - 1) // cols
+    sheet = Image.new("RGB", (cols * w + (cols + 1) * 12, rows * (h + 34) + 12), (14, 15, 20))
+    d = ImageDraw.Draw(sheet)
+    for i, name in enumerate(m.PRESET_NAMES):
+        x, y = 12 + (i % cols) * (w + 12), 12 + (i // cols) * (h + 34)
+        sheet.paste(Image.open(os.path.join(icons, f"preset_{i}.png")).resize((w, h)), (x, y))
+        d.text((x + 4, y + h + 8), name, fill=(214, 216, 226))
+    sheet.save(os.path.join(st, "Пресеты.png"))
+    pat = Image.new("RGB", (5 * 172 + 12, 2 * 102 + 12), (14, 15, 20))
+    for i in range(10):
+        pat.paste(Image.open(os.path.join(icons, f"pattern_{i}.png")), (12 + (i % 5) * 172, 12 + (i // 5) * 102))
+    pat.save(os.path.join(st, "Узоры пикселей.png"))
+    cover = make_cover()
+    cover.save(os.path.join(st, "Обложка.png"))
+    with open(os.path.join(st, "Описание товара.txt"), "w", encoding="utf-8") as f:
+        f.write(STORE_TEXT)
 
 
 def main():
@@ -162,6 +245,7 @@ def main():
                     info.external_attr = (0o755 | 0o100000) << 16  # исполняемый после распаковки на Mac/Linux
                 with open(full, "rb") as fh:
                     z.writestr(info, fh.read(), zipfile.ZIP_DEFLATED)
+    make_store(m)
     print("готово:", zpath)
 
 
