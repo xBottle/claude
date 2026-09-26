@@ -50,12 +50,26 @@ for k in pairs(DATA.DEFAULTS) do IDS[#IDS + 1] = k end
 table.sort(IDS)
 
 local function applyTable(t, label)
-    if comp then pcall(function() comp:StartUndo("CRT пресет: " .. label) end) end
+    -- Lock: пока ставим ~100 значений, Resolve не перерисовывает кадр.
+    -- Иначе каждый SetInput запускает рендер, прерывает прошлый (отсюда
+    -- ошибки ScreenWarp/FinalMix в консоли) и часть значений «теряется».
+    if comp then
+        pcall(function() comp:Lock() end)
+        pcall(function() comp:StartUndo("CRT пресет: " .. label) end)
+    end
+    local failed = 0
     for _, k in ipairs(IDS) do
         local v = t[k]
-        if type(v) == "number" then pcall(function() tool:SetInput(k, v) end) end
+        if type(v) == "number" then
+            local ok = pcall(function() tool:SetInput(k, v) end)
+            if not ok then failed = failed + 1 end
+        end
     end
-    if comp then pcall(function() comp:EndUndo(true) end) end
+    if comp then
+        pcall(function() comp:EndUndo(true) end)
+        pcall(function() comp:Unlock() end)
+    end
+    if failed > 0 then print("[CRT Presets] не применилось параметров: " .. failed) end
 end
 local function current()
     local t = {}

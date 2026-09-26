@@ -317,12 +317,12 @@ local function say(title, text)
   if C then C:AskUser(title, { { "Info", "Text", Name = "", Default = text, Lines = 3, Wrap = true } }) else print(text) end
 end
 local function applyTable(t)
-  if C then pcall(function() C:StartUndo("CRT Pro") end) end
+  if C then pcall(function() C:Lock() end); pcall(function() C:StartUndo("CRT Pro") end) end
   for _, k in ipairs(IDS) do
     local v = t[k]
-    if type(v) == "number" then tool:SetInput(k, v) end
+    if type(v) == "number" then pcall(function() tool:SetInput(k, v) end) end
   end
-  if C then pcall(function() C:EndUndo(true) end) end
+  if C then pcall(function() C:EndUndo(true) end); pcall(function() C:Unlock() end) end
 end
 local function current()
   local t = {}
