@@ -44,6 +44,43 @@ def load_builder(demo=False):
     return m
 
 
+DEMO_TOOLS = """
+				DemoText = TextPlus {
+					Inputs = {
+						UseFrameFormatSettings = Input { Value = 1, },
+						Width = Input { Value = 1920, },
+						Height = Input { Value = 1080, },
+						StyledText = Input { Value = "CRT PRO DEMO", },
+						Font = Input { Value = "Open Sans", },
+						Style = Input { Value = "Bold", },
+						Size = Input { Value = 0.14, },
+						Red1 = Input { Value = 1, },
+						Green1 = Input { Value = 1, },
+						Blue1 = Input { Value = 1, },
+						Alpha1 = Input { Value = 0.4, },
+					},
+					ViewInfo = OperatorInfo { Pos = { -795, 80 } },
+				},
+				DemoMerge = Merge {
+					Inputs = {
+						Background = Input { SourceOp = "FinalMix", Source = "Output", },
+						Foreground = Input { SourceOp = "DemoText", Source = "Output", },
+						PerformDepthMerge = Input { Value = 0, },
+					},
+					ViewInfo = OperatorInfo { Pos = { -685, 0 } },
+				},
+"""
+
+
+def add_demo_mark(st):
+    """Крупная надпись CRT PRO DEMO штатными нодами Text+ и Merge поверх результата."""
+    out = 'MainOutput1 = InstanceOutput {\n\t\t\t\t\tSourceOp = "FinalMix",'
+    end = "\t\t\t},\n\t\t},\n\t},\n\tActiveTool"
+    assert out in st and st.count(end) == 1
+    st = st.replace(out, out.replace("FinalMix", "DemoMerge"))
+    return st.replace(end, DEMO_TOOLS.lstrip("\n") + end)
+
+
 def publicize(src, name):
     return (src.replace("Templates/Edit/Effects/Claude/CRT/CRT Pro v2.setting", f"Templates/Edit/Effects/{CAT}/{name}.setting")
                .replace("Scripts/Comp/crt-2.0/", f"Scripts/Comp/{SCR}/")
@@ -260,7 +297,7 @@ def build_edition(name, demo):
         os.makedirs(os.path.join(P, d), exist_ok=True)
     with open(os.path.join(P, "Effect", name + ".setting"), "w", encoding="utf-8") as f:
         st = publicize(m.build_setting(0), name)
-        f.write(st.replace("Fuse.CRTCore", "Fuse.CRTCoreDemo") if demo else st)
+        f.write(add_demo_mark(st.replace("Fuse.CRTCore", "Fuse.CRTCoreDemo")) if demo else st)
     shutil.copy2(os.path.join(HERE, "effect", SRC + ".png"), os.path.join(P, "Effect", name + ".png"))
     fuse = publicize(strip_lua_comments(m.build_fuse()), "CRT Pro").replace('REGS_Category = "Claude"', 'REGS_Category = "STORYVERSE"')
     if demo:
