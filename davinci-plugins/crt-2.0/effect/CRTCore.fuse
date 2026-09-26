@@ -7,6 +7,8 @@ CRT Core — процедурное GPU-ядро эффекта CRT Pro v2.
 Файл собран автоматически из build_crt_pro_2.py — правь шаблон, не результат.
 ]]
 
+DEMO_BUILD = false  -- make_release.py ставит true в демо-сборке
+
 FuRegisterClass("CRTCore", CT_Tool, {
     REGS_Name = "CRT Core",
     REGS_Category = "Claude",
@@ -132,7 +134,7 @@ CRTParams = [[
     float ShakeSpeed;
     float ShakeJitter;
     float ShakeEdges;
-    float shakeU; float shakeV; float flickN; float bandY; float seed; float period; float hasPrev;
+    float shakeU; float shakeV; float flickN; float bandY; float seed; float period; float hasPrev; float demo;
 ]]
 
 CRTKernel = [[
@@ -144,6 +146,28 @@ __DEVICE__ float sstep(float a, float b, float v) {
 }
 __DEVICE__ float hash3(float x, float y, float z) {
     return fract1(_sinf(x * 12.9898f + y * 78.233f + z * 37.719f) * 43758.5453f);
+}
+/* водяной знак демо: пиксельный шрифт 5x7, текст «CRT PRO DEMO» */
+__DEVICE__ int glyphRow(int ch, int row) {
+    /* C R T _ P R O _ D E M O ; каждая строка — 5 бит */
+    int G[8][7] = {
+        {14,17,16,16,16,17,14}, /* C */ {30,17,17,30,20,18,17}, /* R */ {31,4,4,4,4,4,4},       /* T */
+        {30,17,17,30,16,16,16}, /* P */ {14,17,17,17,17,17,14}, /* O */ {30,17,17,17,17,17,30}, /* D */
+        {31,16,16,30,16,16,31}, /* E */ {17,27,21,21,17,17,17}  /* M */ };
+    if (ch < 0) return 0;
+    return G[ch][row];
+}
+__DEVICE__ float watermark(float fx, float fy, float H) {
+    int TXT[12] = { 0, 1, 2, -1, 3, 1, 4, -1, 5, 6, 7, 4 };
+    float px = _fmaxf(2.0f, _floor(H / 180.0f));       /* размер «пикселя» шрифта */
+    float cw = 6.0f * px, lw = 12.0f * cw;              /* ширина символа и строки */
+    float tx = fx + _floor(fy / (px * 40.0f)) * lw * 0.5f;  /* сдвиг каждой второй строки */
+    float gx = tx - _floor(tx / (lw + cw * 4.0f)) * (lw + cw * 4.0f);
+    float gy = fy - _floor(fy / (px * 40.0f)) * (px * 40.0f) - px * 16.0f;
+    if (gy < 0.0f || gy >= 7.0f * px || gx >= lw) return 0.0f;
+    int ci = (int)_floor(gx / cw), col = (int)_floor((gx - (float)ci * cw) / px), row = 6 - (int)_floor(gy / px);
+    if (col > 4) return 0.0f;
+    return ((glyphRow(TXT[ci], row) >> (4 - col)) & 1) ? 1.0f : 0.0f;
 }
 __DEVICE__ float luma(float r, float g, float b) { return 0.2126f * r + 0.7152f * g + 0.0722f * b; }
 __DEVICE__ float gam(float v, float g) { return v > 0.0f ? _powf(v, 1.0f / _fmaxf(g, 0.01f)) : v; }
@@ -394,6 +418,12 @@ __KERNEL__ void CRTKernel(__CONSTANTREF__ CRTParams *p, __TEXTURE2D__ src, __TEX
         { float L = luma(r, g, b); r = L + (r - L) * p->OutSat; g = L + (g - L) * p->OutSat; b = L + (b - L) * p->OutSat; }
         if (p->OutClip > 0.5f) { r = cl01(r); g = cl01(g); b = cl01(b); }
 
+        /* демо: полупрозрачная надпись поверх всего */
+        if (p->demo > 0.5f) {
+            float wm = watermark(fx, fy, H) * 0.45f;
+            r += (1.0f - r) * wm; g += (1.0f - g) * wm; b += (1.0f - b) * wm;
+        }
+
         /* общий микс с оригиналом */
         float4 o = _tex2DVecN(org, fx / W, fy / H, 15);
         float m = p->GlobalMix;
@@ -540,6 +570,7 @@ function Process(req)
     if not node then OutImage:Set(req, src) return end
     local p = node:GetParamBlock(CRTParams)
     p.w, p.h, p.stage = W, H, stage
+    p.demo = DEMO_BUILD and 1 or 0
     for k, v in pairs(V) do p[k] = v end
 
     -- размер ячейки (как CellPx в 1.0)

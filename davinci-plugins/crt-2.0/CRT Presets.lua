@@ -8,6 +8,9 @@ local function scriptDir()
     return (path:match("^(.*)[/\\][^/\\]+$") or ".") .. "/"
 end
 local DIR = scriptDir()
+local DEMO = false          -- make_release.py ставит true в демо-сборке
+local DEMO_FREE = 5         -- в демо доступны первые 5 пресетов
+local DEMO_MSG = "Это доступно в полной версии CRT Pro."
 
 local chunk, err = loadfile(DIR .. "crt_pro_data.lua")
 if not chunk then print("[CRT Presets] нет crt_pro_data.lua: " .. tostring(err)) return end
@@ -163,9 +166,10 @@ while reopen do
     -- все пресеты: встроенные + свои (★)
     local items = {}
     for i, n in ipairs(DATA.PRESET_NAMES) do
-        items[#items + 1] = { kind = "builtin", index = i - 1, name = n, ico = "preset_" .. (i - 1) }
+        items[#items + 1] = { kind = "builtin", index = i - 1, name = n, ico = "preset_" .. (i - 1),
+            locked = DEMO and i > DEMO_FREE }
     end
-    for _, n in ipairs(listOwn()) do
+    for _, n in ipairs(DEMO and {} or listOwn()) do
         items[#items + 1] = { kind = "own", name = n, ico = "preset_own", thumb = PRESET_DIR .. n .. ".png" }
     end
 
@@ -184,7 +188,7 @@ while reopen do
         return icon(it.ico) or icon("preset_0")
     end
     -- список с прокруткой: одна строка = один пресет
-    local function label(it) return (it.kind == "own" and "★ " or "") .. it.name end
+    local function label(it) return (it.kind == "own" and "★ " or "") .. it.name .. (it.locked and "   🔒" or "") end
     local byLabel = {}
     for _, it in ipairs(items) do byLabel[label(it)] = it end
 
@@ -210,7 +214,7 @@ QPushButton:hover { border:1px solid #22d3ee; }]]
 
     local win = disp:AddWindow({
         ID = "CRTPresetsWin",
-        WindowTitle = "CRT PRO v2",
+        WindowTitle = DEMO and "CRT PRO — DEMO" or "CRT PRO",
         Geometry = geom,
         StyleSheet = [[QWidget { background:#0e0f14; color:#e6e7ee; font-size:12px; }
 QLineEdit { background:#15161c; border:1px solid #2b2c36; border-radius:10px; padding:9px; font-size:13px; color:#e6e7ee; }
@@ -248,7 +252,7 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height:0; }]] },
             },
             ui:Button{ ID = "BtnThumb", Text = "Снять превью с текущего кадра (для своего ★)", StyleSheet = btnStyle(WHITE), Weight = 0 },
             ui:Label{ ID = "Status", Text = statusText, Weight = 0, WordWrap = true, StyleSheet = "color:#9d8cff;" },
-            ui:Label{ Text = "CRT PRO v2  ·  GPU procedural core", Weight = 0, Alignment = { AlignHCenter = true },
+            ui:Label{ Text = DEMO and "CRT PRO  ·  DEMO  ·  полная версия без водяного знака" or "CRT PRO  ·  GPU procedural core", Weight = 0, Alignment = { AlignHCenter = true },
                 StyleSheet = "color:#4a4c58; font-size:10px; letter-spacing:1px;" },
         },
     })
@@ -294,6 +298,7 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height:0; }]] },
         local txt = ev.item and ev.item.Text[0]
         local it = txt and byLabel[(txt:gsub("^%s+", ""))]
         if not it then return end
+        if it.locked then status("🔒 «" .. it.name .. "» — " .. DEMO_MSG) return end
         selected = it
         itm.NameEdit.Text = it.name
         apply(it)
@@ -342,10 +347,12 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height:0; }]] },
     end
 
     function win.On.BtnSave.Clicked()
+        if DEMO then status("Свои пресеты — " .. DEMO_MSG) return end
         saveAs(itm.NameEdit.Text, current())
     end
 
     function win.On.BtnPaste.Clicked()
+        if DEMO then status("Свои пресеты — " .. DEMO_MSG) return end
         local cb = ""
         pcall(function() local x = bmd.getclipboard(); if type(x) == "string" then cb = x end end)
         local t = fromCode(cb)
@@ -354,6 +361,7 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height:0; }]] },
     end
 
     function win.On.BtnRename.Clicked()
+        if DEMO then status("Свои пресеты — " .. DEMO_MSG) return end
         if not selected or selected.kind ~= "own" then status("Переименовать можно только свой пресет (★).") return end
         local new = cleanName(itm.NameEdit.Text)
         if new == "" or new == selected.name then status("Впиши новое название в поле.") return end
@@ -368,6 +376,7 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height:0; }]] },
     end
 
     function win.On.BtnThumb.Clicked()
+        if DEMO then status("Свои пресеты — " .. DEMO_MSG) return end
         if not selected or selected.kind ~= "own" then status("Сначала выбери свой пресет (★).") return end
         local ok = false
         pcall(function()
@@ -378,6 +387,7 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height:0; }]] },
     end
 
     function win.On.BtnDelete.Clicked()
+        if DEMO then status("Свои пресеты — " .. DEMO_MSG) return end
         if not selected or selected.kind ~= "own" then status("Удалить можно только свой пресет (★).") return end
         os.remove(PRESET_DIR .. selected.name .. ".crtpreset")
         os.remove(PRESET_DIR .. selected.name .. ".png")

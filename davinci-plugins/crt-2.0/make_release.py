@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Собирает чистую папку для продажи/раздачи: dist/CRT Pro v2/ + zip.
+"""Собирает чистую папку для продажи/раздачи: dist/CRT Pro/ и dist/CRT Pro Demo/ + zip.
 В пакет попадает только то, что нужно покупателю: файлы эффекта и установщики
 для macOS, Windows и Linux. Исходники, генераторы, валидаторы — не попадают.
 
@@ -11,18 +11,33 @@ import zipfile
 import importlib.util
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-NAME = "CRT Pro v2"
+SRC = "CRT Pro v2"            # имя исходников в репозитории
 DIST = os.path.join(HERE, "dist")
-OUT = os.path.join(DIST, NAME)
-P = os.path.join(OUT, "payload")
+DEMO_FREE = 5                  # сколько пресетов открыто в демо
+# Публичные пути (не пересекаются с CRT Pro 1.0 в Claude/CRT)
+CAT, SCR, LUTD = "CRT Pro", "crt-pro", "CRT Pro"
 
 
-def load_builder():
+def load_builder(demo=False):
     spec = importlib.util.spec_from_file_location("b", os.path.join(HERE, "build_crt_pro_2.py"))
     m = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(m)
     m.SHARE_MODE = True  # свои пресеты автора в продаваемый пакет не попадают
+    if demo:
+        del m.PRESET_NAMES[DEMO_FREE:]
+        for k in [k for k in m.PRESETS if k >= DEMO_FREE]:
+            del m.PRESETS[k]
+        cut = {"BtnSave", "BtnLoad", "BtnDelete", "BtnCopy", "BtnPaste"}
+        sid, title, opn, items = m.SECTIONS[0]
+        m.SECTIONS[0] = (sid, title, opn, [c for c in items if c.id not in cut])
+        m.own_presets = lambda: []
     return m
+
+
+def publicize(src, name):
+    return (src.replace("Templates/Edit/Effects/Claude/CRT/CRT Pro v2.setting", f"Templates/Edit/Effects/{CAT}/{name}.setting")
+               .replace("Scripts/Comp/crt-2.0/", f"Scripts/Comp/{SCR}/")
+               .replace("CRT Pro v2", name).replace("CRT PRO v2", "CRT PRO"))
 
 
 def strip_lua_comments(src):
@@ -37,15 +52,15 @@ def strip_lua_comments(src):
 
 
 MAC = r'''#!/bin/bash
-# CRT Pro v2 — установка для macOS. Двойной клик.
+# @NAME@ — установка для macOS. Двойной клик.
 cd "$(dirname "$0")/payload"
 FU="$HOME/Library/Application Support/Blackmagic Design/DaVinci Resolve/Fusion"
-mkdir -p "$FU/Templates/Edit/Effects/Claude/CRT" "$FU/Fuses" "$FU/Scripts/Comp/crt-2.0"
-cp -f Effect/* "$FU/Templates/Edit/Effects/Claude/CRT/"
+mkdir -p "$FU/Templates/Edit/Effects/@CAT@" "$FU/Fuses" "$FU/Scripts/Comp/@SCR@"
+cp -f Effect/* "$FU/Templates/Edit/Effects/@CAT@/"
 cp -f Fuses/* "$FU/Fuses/"
-cp -Rf Presets/* "$FU/Scripts/Comp/crt-2.0/"
-echo "CRT Pro v2: эффект установлен."
-SYS="/Library/Application Support/Blackmagic Design/DaVinci Resolve/LUT/Claude"
+cp -Rf Presets/* "$FU/Scripts/Comp/@SCR@/"
+echo "@NAME@: эффект установлен."
+SYS="/Library/Application Support/Blackmagic Design/DaVinci Resolve/LUT/@LUT@"
 echo "Для страницы Color нужен пароль администратора (можно пропустить: Ctrl+C):"
 sudo mkdir -p "$SYS" && sudo cp -f Color/* "$SYS/" && echo "DCTL для страницы Color установлен."
 echo
@@ -55,17 +70,17 @@ read -n 1 -s -r -p "Нажмите любую клавишу..."
 
 WIN = r'''@echo off
 chcp 65001 >nul
-REM CRT Pro v2 — установка для Windows. Двойной клик (для страницы Color — «Запуск от имени администратора»).
+REM @NAME@ — установка для Windows. Двойной клик (для страницы Color — «Запуск от имени администратора»).
 cd /d "%~dp0payload"
 set "FU=%APPDATA%\Blackmagic Design\DaVinci Resolve\Support\Fusion"
-mkdir "%FU%\Templates\Edit\Effects\Claude\CRT" 2>nul
+mkdir "%FU%\Templates\Edit\Effects\@CAT@" 2>nul
 mkdir "%FU%\Fuses" 2>nul
-mkdir "%FU%\Scripts\Comp\crt-2.0" 2>nul
-xcopy /Y /Q "Effect\*" "%FU%\Templates\Edit\Effects\Claude\CRT\" >nul
+mkdir "%FU%\Scripts\Comp\@SCR@" 2>nul
+xcopy /Y /Q "Effect\*" "%FU%\Templates\Edit\Effects\@CAT@\" >nul
 xcopy /Y /Q "Fuses\*" "%FU%\Fuses\" >nul
-xcopy /Y /Q /E "Presets\*" "%FU%\Scripts\Comp\crt-2.0\" >nul
-echo CRT Pro v2: эффект установлен.
-set "LUT=%ProgramData%\Blackmagic Design\DaVinci Resolve\Support\LUT\Claude"
+xcopy /Y /Q /E "Presets\*" "%FU%\Scripts\Comp\@SCR@\" >nul
+echo @NAME@: эффект установлен.
+set "LUT=%ProgramData%\Blackmagic Design\DaVinci Resolve\Support\LUT\@LUT@"
 mkdir "%LUT%" 2>nul
 xcopy /Y /Q "Color\*" "%LUT%\" >nul && echo DCTL для страницы Color установлен. || echo Для страницы Color запустите установщик от имени администратора.
 echo.
@@ -74,21 +89,21 @@ pause
 '''
 
 LINUX = r'''#!/bin/bash
-# CRT Pro v2 — установка для Linux: bash install-linux.sh
+# @NAME@ — установка для Linux: bash install-linux.sh
 cd "$(dirname "$0")/payload"
 FU="$HOME/.local/share/DaVinciResolve/Fusion"
-mkdir -p "$FU/Templates/Edit/Effects/Claude/CRT" "$FU/Fuses" "$FU/Scripts/Comp/crt-2.0"
-cp -f Effect/* "$FU/Templates/Edit/Effects/Claude/CRT/"
+mkdir -p "$FU/Templates/Edit/Effects/@CAT@" "$FU/Fuses" "$FU/Scripts/Comp/@SCR@"
+cp -f Effect/* "$FU/Templates/Edit/Effects/@CAT@/"
 cp -f Fuses/* "$FU/Fuses/"
-cp -rf Presets/* "$FU/Scripts/Comp/crt-2.0/"
-echo "CRT Pro v2: эффект установлен."
+cp -rf Presets/* "$FU/Scripts/Comp/@SCR@/"
+echo "@NAME@: эффект установлен."
 if [ -d /opt/resolve/LUT ]; then
-  sudo mkdir -p /opt/resolve/LUT/Claude && sudo cp -f Color/* /opt/resolve/LUT/Claude/ && echo "DCTL установлен."
+  sudo mkdir -p /opt/resolve/LUT/@LUT@ && sudo cp -f Color/* /opt/resolve/LUT/@LUT@/ && echo "DCTL установлен."
 fi
 echo "Готово. Перезапустите DaVinci Resolve."
 '''
 
-README = '''CRT PRO v2 — процедурный CRT-эффект для DaVinci Resolve 18+ (Studio / Free*)
+README = '''@UNAME@ — процедурный CRT-эффект для DaVinci Resolve 18+ (Studio / Free*)
 =========================================================================
 
 УСТАНОВКА
@@ -100,9 +115,9 @@ README = '''CRT PRO v2 — процедурный CRT-эффект для DaVinc
   После установки перезапустите DaVinci Resolve.
 
 ГДЕ НАЙТИ
-  Edit / Cut : Effects → Эффекты → Claude → CRT → «CRT Pro v2»
+  Edit / Cut : Effects → Эффекты → @CAT@ → «@NAME@»
   Fusion     : Shift+Пробел → «CRT Core»
-  Color      : Effects → DCTL → в списке DCTL выбрать Claude / CRT Pro v2
+  Color      : Effects → DCTL → в списке DCTL выбрать @LUT@ / @NAME@
 
 КАК ПОЛЬЗОВАТЬСЯ
   • Вкладка «Управление» → «ОКНО ПРЕСЕТОВ»: 18 пресетов с превью (список с прокруткой),
@@ -116,7 +131,7 @@ README = '''CRT PRO v2 — процедурный CRT-эффект для DaVinc
 © CRT Pro. Лицензия — см. LICENSE.txt
 '''
 
-LICENSE = '''CRT PRO v2 — ЛИЦЕНЗИЯ
+LICENSE = '''@UNAME@ — ЛИЦЕНЗИЯ
 Лицензия даёт право одному пользователю устанавливать и использовать эффект
 в личных и коммерческих проектах (видео, клипы, реклама) без ограничений.
 Запрещено: перепродавать, публиковать или передавать файлы эффекта третьим
@@ -124,7 +139,7 @@ LICENSE = '''CRT PRO v2 — ЛИЦЕНЗИЯ
 '''
 
 
-STORE_TEXT = """CRT PRO v2 — процедурный CRT для DaVinci Resolve
+STORE_TEXT = """@UNAME@ — процедурный CRT для DaVinci Resolve
 ====================================================
 
 Настоящие пиксели кинескопа, а не наложенная картинка. Эффект считается
@@ -205,40 +220,72 @@ def make_store(m):
     cover.save(os.path.join(st, "Обложка.png"))
     shutil.copy2(os.path.join(HERE, "store_assets", "Страница товара.md"), os.path.join(st, "Страница товара.md"))
     with open(os.path.join(st, "Описание товара.txt"), "w", encoding="utf-8") as f:
-        f.write(STORE_TEXT)
+        f.write(fill(STORE_TEXT, "CRT Pro", False))
 
 
-def main():
-    m = load_builder()
-    shutil.rmtree(DIST, ignore_errors=True)
-    for d in ("Effect", "Fuses", "Presets/icons", "Color"):
+DEMO_NOTE = """
+ДЕМО-ВЕРСИЯ
+  Это демо «просто попробовать»: на картинке водяной знак CRT PRO DEMO,
+  открыто 5 пресетов из 18, нет своих пресетов и DCTL для страницы Color.
+  Полная версия — без водяного знака и без ограничений.
+"""
+
+
+def fill(txt, name, demo):
+    txt = (txt.replace("@NAME@", name).replace("@UNAME@", name.upper())
+              .replace("@CAT@", CAT).replace("@SCR@", SCR).replace("@LUT@", LUTD))
+    if demo:  # в демо нет DCTL — убираем строки установки Color
+        keys = ("LUT", "Color/*", "Color\\*", "страницы Color", "Для страницы Color")
+        txt = "\n".join(l for l in txt.split("\n") if not any(k in l for k in keys) and l.strip() != "fi")
+    return txt
+
+
+def build_edition(name, demo):
+    m = load_builder(demo)
+    out = os.path.join(DIST, name)
+    P = os.path.join(out, "payload")
+    for d in ("Effect", "Fuses", "Presets/icons") + (() if demo else ("Color",)):
         os.makedirs(os.path.join(P, d), exist_ok=True)
-    with open(os.path.join(P, "Effect", NAME + ".setting"), "w", encoding="utf-8") as f:
-        f.write(m.build_setting(0))
-    shutil.copy2(os.path.join(HERE, "effect", NAME + ".png"), os.path.join(P, "Effect"))
+    with open(os.path.join(P, "Effect", name + ".setting"), "w", encoding="utf-8") as f:
+        f.write(publicize(m.build_setting(0), name))
+    shutil.copy2(os.path.join(HERE, "effect", SRC + ".png"), os.path.join(P, "Effect", name + ".png"))
+    fuse = publicize(strip_lua_comments(m.build_fuse()), "CRT Pro").replace('REGS_Category = "Claude"', 'REGS_Category = "CRT Pro"')
+    if demo:
+        assert "DEMO_BUILD = false" in fuse
+        fuse = fuse.replace("DEMO_BUILD = false", "DEMO_BUILD = true")
     with open(os.path.join(P, "Fuses", "CRTCore.fuse"), "w", encoding="utf-8") as f:
-        f.write(strip_lua_comments(m.build_fuse()))
+        f.write(fuse)
     with open(os.path.join(HERE, "CRT Presets.lua"), encoding="utf-8") as f:
-        presets = strip_lua_comments(f.read())
+        presets = publicize(f.read(), name)
+    if demo:
+        assert "local DEMO = false" in presets
+        presets = presets.replace("local DEMO = false", "local DEMO = true")
     with open(os.path.join(P, "Presets", "CRT Presets.lua"), "w", encoding="utf-8") as f:
-        f.write(presets)
+        f.write(strip_lua_comments(presets))
     shutil.copy2(os.path.join(HERE, "crt_pro_data.lua"), os.path.join(P, "Presets"))
     for fn in os.listdir(os.path.join(HERE, "icons")):
         if fn.endswith(".png"):
             shutil.copy2(os.path.join(HERE, "icons", fn), os.path.join(P, "Presets", "icons"))
-    shutil.copy2(os.path.join(HERE, NAME + ".dctl"), os.path.join(P, "Color"))
+    if not demo:
+        with open(os.path.join(HERE, SRC + ".dctl"), encoding="utf-8") as f:
+            dctl = f.read().replace("CRT Pro v2", "CRT Pro")
+        with open(os.path.join(P, "Color", "CRT Pro.dctl"), "w", encoding="utf-8") as f:
+            f.write(dctl)
 
-    files = {"Установить (macOS).command": MAC, "Установить (Windows).bat": WIN.replace("\n", "\r\n"),
-             "install-linux.sh": LINUX, "README.txt": README, "LICENSE.txt": LICENSE}
+    readme = fill(README, name, demo) + (DEMO_NOTE if demo else "")
+    files = {"Установить (macOS).command": fill(MAC, name, demo),
+             "Установить (Windows).bat": fill(WIN, name, demo).replace("\n", "\r\n"),
+             "install-linux.sh": fill(LINUX, name, demo), "README.txt": readme,
+             "LICENSE.txt": fill(LICENSE, name, demo)}
     for fn, txt in files.items():
-        with open(os.path.join(OUT, fn), "w", encoding="utf-8", newline="") as f:
+        with open(os.path.join(out, fn), "w", encoding="utf-8", newline="") as f:
             f.write(txt)
         if fn.endswith((".command", ".sh")):
-            os.chmod(os.path.join(OUT, fn), 0o755)
+            os.chmod(os.path.join(out, fn), 0o755)
 
-    zpath = os.path.join(DIST, NAME + ".zip")
+    zpath = os.path.join(DIST, name + ".zip")
     with zipfile.ZipFile(zpath, "w", zipfile.ZIP_DEFLATED) as z:
-        for root, _, fs in os.walk(OUT):
+        for root, _, fs in os.walk(out):
             for fn in fs:
                 full = os.path.join(root, fn)
                 info = zipfile.ZipInfo.from_file(full, os.path.relpath(full, DIST))
@@ -246,8 +293,15 @@ def main():
                     info.external_attr = (0o755 | 0o100000) << 16  # исполняемый после распаковки на Mac/Linux
                 with open(full, "rb") as fh:
                     z.writestr(info, fh.read(), zipfile.ZIP_DEFLATED)
-    make_store(m)
     print("готово:", zpath)
+    return m
+
+
+def main():
+    shutil.rmtree(DIST, ignore_errors=True)
+    m = build_edition("CRT Pro", False)
+    build_edition("CRT Pro Demo", True)
+    make_store(m)
 
 
 if __name__ == "__main__":
