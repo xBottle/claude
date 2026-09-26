@@ -1,0 +1,348 @@
+--[[
+VHS Core — процедурное GPU-ядро эффекта VHS Pro.
+Один проход на видеокарте (DVIPComputeNode): съёмка с рук, трекинг, полоса
+смены головок, залом плёнки, режимы магнитофона, размытие яркости и цвета
+по строке (как у кассеты), цвет плёнки, снег и выпадения, надписи камеры.
+Файл собран автоматически из build_vhs_pro.py — правь шаблон, не результат.
+]]
+
+DEMO_BUILD = false  -- make_release.py ставит true в демо-сборке
+
+FuRegisterClass("VHSCore", CT_Tool, {
+    REGS_Name = "VHS Core",
+    REGS_Category = "STORYVERSE\\VHS",
+    REGS_OpIconString = "VHSc",
+    REGS_OpDescription = "Procedural VHS core (GPU)",
+    REG_NoMotionBlurCtrls = true,
+    REG_NoBlendCtrls = true,
+    REG_OpNoMask = true,
+    REG_TimeVariant = true,
+    REG_SupportsDoD = false,
+    REG_Version = 1,
+})
+
+VHSParams = [[
+    float w; float h; float s; float seed; float sec;
+__PARAM_FIELDS__
+    float camX; float camY; float camR; float camS; float expo; float jumpY;
+    float creaseY; float bar0; float bar1; float bar2; float barH; float skew;
+    float osdPx; float osdX; float osdTop; float osdBot;
+    float T0; float T1; float T2; float T3; float T4; float T5;
+    float T6; float T7; float T8; float T9; float T10; float T11;
+    float T12; float T13; float T14; float T15; float T16; float T17;
+]]
+
+VHSKernel = [[
+__DEVICE__ float cl01(float v) { return _fminf(_fmaxf(v, 0.0f), 1.0f); }
+__DEVICE__ float fract1(float v) { return v - _floor(v); }
+__DEVICE__ float hash3(float x, float y, float z) {
+    return fract1(_sinf(x * 12.9898f + y * 78.233f + z * 37.719f) * 43758.5453f);
+}
+__DEVICE__ float lumaY(float4 c) { return 0.299f * c.x + 0.587f * c.y + 0.114f * c.z; }
+__DEVICE__ float chI(float4 c) { return 0.596f * c.x - 0.274f * c.y - 0.322f * c.z; }
+__DEVICE__ float chQ(float4 c) { return 0.211f * c.x - 0.523f * c.y + 0.312f * c.z; }
+/* пиксельный шрифт 5x7 экранного меню камеры: строки 0-3 и 4-6 по 5 бит */
+__FONT__
+__DEVICE__ int glyphRow(int c, int row) {
+    if (row < 4) return (glyphA(c) >> (5 * (3 - row))) & 31;
+    return (glyphB(c) >> (5 * (6 - row))) & 31;
+}
+__DEVICE__ float pick6(float a, float b, float c, float d, float e, float f, int i) {
+    return i == 0 ? a : i == 1 ? b : i == 2 ? c : i == 3 ? d : i == 4 ? e : f;
+}
+/* одна строка надписи (до 18 символов, по 3 символа в числе) */
+__DEVICE__ float osdLine(float gx, float gy, float px, float a, float b, float c, float d, float e, float f) {
+    if (gx < 0.0f || gy < 0.0f || gy >= 7.0f * px || gx >= 108.0f * px) return 0.0f;
+    int ci = (int)_floor(gx / (6.0f * px));
+    int col = (int)_floor((gx - (float)ci * 6.0f * px) / px);
+    if (col > 4) return 0.0f;
+    int row = 6 - (int)_floor(gy / px);
+    int packed = (int)(pick6(a, b, c, d, e, f, ci / 3) + 0.5f);
+    int code = (packed >> (6 * (ci % 3))) & 63;
+    return ((glyphRow(code, row) >> (4 - col)) & 1) ? 1.0f : 0.0f;
+}
+
+__KERNEL__ void VHSKernel(__CONSTANTREF__ VHSParams *p, __TEXTURE2D__ src, __TEXTURE2D__ org, __TEXTURE2D_WRITE__ dst)
+{
+    DEFINE_KERNEL_ITERATORS_XY(x, y);
+    if (x >= (int)p->w || y >= (int)p->h) return;
+    float W = p->w, H = p->h, s = p->s, seed = p->seed;
+    float fx = (float)x + 0.5f, fy = (float)y + 0.5f;
+    float cx = W * 0.5f, cy = H * 0.5f;
+
+    /* 1. съёмка с рук: сдвиг, поворот, масштаб кадра */
+    float dx0 = fx - cx - p->camX * H, dy0 = fy - cy - p->camY * H;
+    float cr = _cosf(p->camR), sr = _sinf(p->camR);
+    float sx = (cr * dx0 + sr * dy0) / p->camS + cx;
+    float sy = (-sr * dx0 + cr * dy0) / p->camS + cy + p->jumpY;
+
+    /* 2. сдвиги строк: трекинг, волна, полоса головок, залом, перемотка */
+    float line = _floor(fy / (2.0f * s));
+    float off = 0.0f;
+    if (p->TrackOn > 0.5f) {
+        off += (hash3(line, seed, 1.0f) - 0.5f) * 2.0f * p->LineJitter * s;
+        off += _sinf(fy / H * 18.85f + p->sec * p->WobbleSpeed * 2.0f) * p->Wobble * s
+             * (0.6f + 0.4f * _sinf(fy / H * 7.0f - p->sec * 1.3f));
+    }
+    float headT = 0.0f;
+    if (p->HeadOn > 0.5f && p->HeadHeight > 0.0f) {
+        float hb = p->HeadHeight * H;
+        if (fy < hb) headT = 1.0f - fy / hb;
+        off += headT * headT * p->HeadShift * s * (0.7f + 0.6f * hash3(line, seed, 2.0f));
+    }
+    float creaseT = 0.0f;
+    if (p->CreaseOn > 0.5f) {
+        float d = _fabs(fy - p->creaseY) / _fmaxf(p->CreaseHeight * H * 0.5f, 1.0f);
+        if (d < 1.0f) {
+            creaseT = 1.0f - d * d;
+            off += creaseT * p->CreaseAmount * 40.0f * s * (hash3(line, seed, 3.0f) - 0.5f) * 2.0f;
+        }
+    }
+    float barT = 0.0f;
+    if (p->barH > 0.0f) {
+        float bh = p->barH * H * 0.5f;
+        float d0 = _fabs(fy - p->bar0 * H), d1 = _fabs(fy - p->bar1 * H), d2 = _fabs(fy - p->bar2 * H);
+        float dm = _fminf(d0, _fminf(d1, d2));
+        if (dm < bh) barT = (1.0f - dm / bh) * p->ModeAmount;
+        off += barT * 60.0f * s * (hash3(line, seed, 4.0f) - 0.3f);
+        off += p->skew * (fy / H - 0.5f) * 30.0f * s;
+    }
+    sx += off;
+
+    /* 3. кассета: яркость и цвет размыты по строке, цвет отстаёт */
+    float lw = p->LumaBlur * s * 0.5f, cw = p->ChromaBlur * s / 3.0f, csh = p->ChromaShift * s;
+    float Yb = 0.0f, I = 0.0f, Q = 0.0f, Yw = 0.0f;
+    float4 c;
+    c = _tex2DVecN(src, (sx - 2.0f * lw) / W, sy / H, 15); Yb += lumaY(c) * 0.0625f;
+    c = _tex2DVecN(src, (sx - lw) / W, sy / H, 15);        Yb += lumaY(c) * 0.25f;
+    c = _tex2DVecN(src, sx / W, sy / H, 15);               Yb += lumaY(c) * 0.375f;
+    float alpha = c.w;
+    c = _tex2DVecN(src, (sx + lw) / W, sy / H, 15);        Yb += lumaY(c) * 0.25f;
+    c = _tex2DVecN(src, (sx + 2.0f * lw) / W, sy / H, 15); Yb += lumaY(c) * 0.0625f;
+    for (int k = -3; k <= 3; k++) {
+        c = _tex2DVecN(src, (sx + csh + (float)k * cw) / W, sy / H, 15);
+        I += chI(c); Q += chQ(c); Yw += lumaY(c);
+    }
+    I *= (1.0f / 7.0f); Q *= (1.0f / 7.0f); Yw *= (1.0f / 7.0f);
+    float Y = Yb + p->Sharpen * (Yb - Yw);   /* ореол на краях, как у VHS */
+
+    /* 4. цвет плёнки */
+    float ha = p->Hue * 0.0174533f, hc = _cosf(ha), hs = _sinf(ha);
+    float I2 = (I * hc - Q * hs) * p->Sat + p->Warmth * 0.06f;
+    float Q2 = (I * hs + Q * hc) * p->Sat;
+    Y = Y * p->Gain * p->expo;
+    Y = p->BlackLift + Y * (1.0f - p->BlackLift);
+    Y = (Y - 0.5f) * (1.0f + p->Contrast) + 0.5f;
+
+    /* 5. снег, цветной шум, выпадения */
+    if (p->NoiseOn > 0.5f) {
+        Y += (hash3(fx * 0.37f, fy * 0.61f, seed) - 0.5f) * p->Snow * 0.6f;
+        float cn = _floor(fx / (6.0f * s));
+        I2 += (hash3(cn, line, seed + 5.0f) - 0.5f) * p->ChromaNoise * 0.25f;
+        Q2 += (hash3(cn, line, seed + 9.0f) - 0.5f) * p->ChromaNoise * 0.25f;
+        if (hash3(line, seed, 6.0f) > 1.0f - p->Dropouts * 0.015f) {
+            float st = hash3(line, seed, 7.0f) * W, ln = (20.0f + 280.0f * hash3(line, seed, 8.0f)) * s;
+            if (fx > st && fx < st + ln) {
+                float tp = 1.0f - (fx - st) / ln;
+                Y += (1.0f - Y) * 0.85f * tp; I2 *= 1.0f - tp; Q2 *= 1.0f - tp;
+            }
+        }
+    }
+    if (headT > 0.0f) {
+        Y += (hash3(fx * 0.3f, fy, seed + 11.0f) - 0.5f) * p->HeadNoise * headT * 1.2f;
+        I2 *= 1.0f - headT * 0.7f; Q2 *= 1.0f - headT * 0.7f;
+    }
+    if (creaseT > 0.0f) {
+        Y += creaseT * p->CreaseAmount * ((hash3(fx * 0.2f, line, seed + 13.0f) - 0.5f) * 0.8f + 0.12f);
+    }
+    if (barT > 0.0f) {
+        float n = hash3(_floor(fx / (3.0f * s)), line, seed + 17.0f);
+        Y = Y + (n * 1.1f - Y) * barT * 0.85f;
+        I2 *= 1.0f - barT; Q2 *= 1.0f - barT;
+    }
+
+    float r = Y + 0.956f * I2 + 0.621f * Q2;
+    float g = Y - 0.272f * I2 - 0.647f * Q2;
+    float b = Y - 1.106f * I2 + 1.703f * Q2;
+
+    /* 6. надписи камеры (дата, время, PLAY) */
+    if (p->OSDOn > 0.5f) {
+        float px = p->osdPx, sh = _fmaxf(1.0f, px * 0.5f), lh = 10.5f * px;
+        float m = 0.0f, shd = 0.0f;
+        m += osdLine(fx - p->osdX, fy - (H - p->osdTop - 7.0f * px), px, p->T0, p->T1, p->T2, p->T3, p->T4, p->T5);
+        m += osdLine(fx - p->osdX, fy - (p->osdBot + lh), px, p->T6, p->T7, p->T8, p->T9, p->T10, p->T11);
+        m += osdLine(fx - p->osdX, fy - p->osdBot, px, p->T12, p->T13, p->T14, p->T15, p->T16, p->T17);
+        shd += osdLine(fx - sh - p->osdX, fy + sh - (H - p->osdTop - 7.0f * px), px, p->T0, p->T1, p->T2, p->T3, p->T4, p->T5);
+        shd += osdLine(fx - sh - p->osdX, fy + sh - (p->osdBot + lh), px, p->T6, p->T7, p->T8, p->T9, p->T10, p->T11);
+        shd += osdLine(fx - sh - p->osdX, fy + sh - p->osdBot, px, p->T12, p->T13, p->T14, p->T15, p->T16, p->T17);
+        m = cl01(m) * p->OSDOpacity; shd = cl01(shd) * p->OSDOpacity * 0.6f;
+        r *= 1.0f - shd; g *= 1.0f - shd; b *= 1.0f - shd;
+        r += (1.0f - r) * m; g += (1.0f - g) * m; b += (1.0f - b) * m;
+    }
+
+    /* 7. кадр: 4:3 и виньетка */
+    if (p->Aspect43 > 0.5f && _fabs(fx - cx) > H * (2.0f / 3.0f)) { r = 0.0f; g = 0.0f; b = 0.0f; }
+    if (p->Vignette > 0.0f) {
+        float vx = (fx - cx) / W * 1.6f, vy = (fy - cy) / H * 1.6f;
+        float vv = 1.0f - p->Vignette * cl01((vx * vx + vy * vy) - 0.15f);
+        r *= vv; g *= vv; b *= vv;
+    }
+
+    /* 8. общий микс с оригиналом */
+    float4 o = _tex2DVecN(org, fx / W, fy / H, 15);
+    float mx = p->GlobalMix;
+    r = o.x + (r - o.x) * mx; g = o.y + (g - o.y) * mx; b = o.z + (b - o.z) * mx;
+    float a = o.w + (alpha - o.w) * mx;
+    _tex2DVec4Write(dst, x, y, make_float4(r, g, b, a));
+}
+]]
+
+function Create()
+__CREATE_INPUTS__
+    InImage = self:AddInput("Input", "Input", { LINKID_DataType = "Image", LINK_Main = 1 })
+    InOrig = self:AddInput("Original", "Original", { LINKID_DataType = "Image", LINK_Main = 2, INP_Required = false })
+    OutImage = self:AddOutput("Output", "Output", { LINKID_DataType = "Image", LINK_Main = 1 })
+end
+
+local function num(inp, req) local v = inp:GetValue(req); return v and v.Value or 0 end
+local function h1(x) return (math.sin(x * 12.9898 + 0.7) * 43758.5453) % 1 end
+
+local CHARS = __CHARS__
+local MONTHS = { "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC" }
+-- строка -> 6 чисел по 3 символа (6 бит на символ)
+local function pack(str)
+    str = string.upper(str or "")
+    local out = { 0, 0, 0, 0, 0, 0 }
+    for i = 1, math.min(#str, 18) do
+        local code = CHARS:find(str:sub(i, i), 1, true)
+        code = code and (code - 1) or 0
+        local f, k = math.floor((i - 1) / 3) + 1, (i - 1) % 3
+        out[f] = out[f] + code * (64 ^ k)
+    end
+    return out
+end
+
+function Process(req)
+    local src = InImage:GetValue(req)
+    local org = InOrig:GetValue(req) or src
+    local t = req.Time
+    local V = {}
+__READ_INPUTS__
+    local W, H = src.Width, src.Height
+    local fps = 24
+    pcall(function() fps = self.Comp:GetPrefs("Comp.FrameFormat.Rate") or 24 end)
+    if not fps or fps <= 0 then fps = 24 end
+    local sec = t / fps
+    local s = (V.ScaleRes > 0.5) and (H / 1080) or 1
+
+    local dst = Image({ IMG_Like = src, IMG_DeferAlloc = true })
+    local node = DVIPComputeNode(req, "VHSKernel", VHSKernel, "VHSParams", VHSParams)
+    if not node then OutImage:Set(req, src) return end
+    local p = node:GetParamBlock(VHSParams)
+    for k, v in pairs(V) do p[k] = v end
+    p.w, p.h, p.s, p.sec = W, H, s, sec
+    p.seed = t % 997
+
+    -- съёмка с рук: плавные «блуждания» + мелкая дрожь + шаги
+    p.camX, p.camY, p.camR, p.camS, p.expo = 0, 0, 0, 1, 1
+    if V.CamOn > 0.5 then
+        local tt = sec * V.CamSpeed
+        local nx = 0.5*math.sin(tt*1.13+0.3) + 0.3*math.sin(tt*2.71+1.7) + 0.2*math.sin(tt*4.97+4.1)
+        local ny = 0.5*math.sin(tt*0.97+2.2) + 0.3*math.sin(tt*2.39+0.4) + 0.2*math.sin(tt*5.31+3.3)
+        local nr = 0.6*math.sin(tt*0.87+2.1) + 0.4*math.sin(tt*2.3+0.4)
+        local tx = 0.5*math.sin(tt*23.1+0.5) + 0.5*math.sin(tt*31.7+2.9)
+        local ty = 0.5*math.sin(tt*19.3+1.4) + 0.5*math.sin(tt*29.9+0.2)
+        local st = sec * V.CamSpeed * 3.3
+        local wy = math.abs(math.sin(st)) - 0.63
+        local wx = math.sin(st * 0.5)
+        p.camX = V.CamShake*0.01*nx + V.CamTremor*0.002*tx + V.CamWalk*0.004*wx
+        p.camY = V.CamShake*0.01*ny + V.CamTremor*0.002*ty + V.CamWalk*0.012*wy
+        local rot = V.CamRot*nr + V.CamTremor*0.1*tx
+        p.camR = math.rad(rot)
+        local zoom = 1 + V.CamZoom*0.08*(0.5 + 0.5*math.sin(tt*0.41))
+        local fill = 1
+        if V.CamFill > 0.5 then
+            local ms = V.CamShake*0.01 + V.CamTremor*0.002 + V.CamWalk*0.012
+            fill = 1 + 2.2*ms + math.sin(math.rad(V.CamRot + V.CamTremor*0.1)) * (W / H + 1)
+        end
+        p.camS = zoom * fill
+        p.expo = 1 + V.ExpoPump*0.25*math.sin(sec*0.7*V.CamSpeed)*math.sin(sec*0.23+1)
+    end
+
+    -- подскок кадра (трекинг)
+    local jr = h1(t + 0.37)
+    p.jumpY = (V.TrackOn > 0.5) and ((jr > 0.9) and (h1(t + 5.1) - 0.5)*2*V.FrameJitter*s
+                                     or (h1(t + 9.3) - 0.5)*0.3*V.FrameJitter*s) or 0
+
+    -- залом плёнки: полоса проезжает сверху вниз раз в N секунд
+    p.creaseY = -1e5
+    if V.CreaseOn > 0.5 then
+        local travel = (sec % math.max(V.CreaseEvery, 0.1)) * V.CreaseSpeed
+        if travel < 1.3 then p.creaseY = H * (1.15 - travel) end
+    end
+
+    -- режим магнитофона
+    p.bar0, p.bar1, p.bar2, p.barH, p.skew = -10, -10, -10, 0, 0
+    local mode = math.floor(V.Mode + 0.5)
+    if mode == 1 then  -- пауза: две дрожащие полосы, кадр подпрыгивает
+        p.bar0 = 0.28 + (h1(t) - 0.5)*0.01
+        p.bar1 = 0.74 + (h1(t + 3) - 0.5)*0.01
+        p.barH = 0.035
+        p.jumpY = p.jumpY + (h1(t + 7) - 0.5)*4*s*V.ModeAmount
+    elseif mode >= 2 then  -- перемотка: бегущие полосы и перекос
+        local dir = (mode == 2) and 1 or -1
+        for i = 0, 2 do p["bar" .. i] = (sec*0.9*dir + i/3) % 1 end
+        p.barH = 0.07
+        p.skew = dir * V.ModeAmount
+    end
+
+    -- надписи камеры
+    local lines = { "", "", "" }
+    if V.OSDOn > 0.5 then
+        local lab = math.floor(V.OSDLabel + 0.5)
+        if lab == 0 then
+            lines[1] = ({ [0] = "PLAY >", "PAUSE |", "REW <<", "FF >>" })[math.min(mode, 3)]
+        elseif lab == 1 then
+            lines[1] = "* REC"
+        end
+        local total = math.floor(V.Hour)*3600 + math.floor(V.Minute)*60 + math.floor(V.Second)
+        if V.ClockRun > 0.5 then total = total + math.floor(sec) end
+        total = total % 86400
+        local hh, mm, ss = math.floor(total/3600), math.floor(total/60) % 60, total % 60
+        if V.Clock12 > 0.5 then
+            local ap = hh >= 12 and "PM" or "AM"
+            local h12 = hh % 12; if h12 == 0 then h12 = 12 end
+            lines[2] = string.format("%s %2d:%02d:%02d", ap, h12, mm, ss)
+        else
+            lines[2] = string.format("%02d:%02d:%02d", hh, mm, ss)
+        end
+        local d, mo, y = math.floor(V.Day), math.max(1, math.min(12, math.floor(V.Month))), math.floor(V.Year)
+        local fmt = math.floor(V.DateFormat + 0.5)
+        if fmt == 0 then lines[3] = string.format("%s. %d %d", MONTHS[mo], d, y)
+        elseif fmt == 1 then lines[3] = string.format("%02d.%02d.%d", d, mo, y)
+        else lines[3] = string.format("%d. %d.%2d", y, mo, d) end
+    end
+    local k = 0
+    for i = 1, 3 do
+        local pk = pack(lines[i])
+        for j = 1, 6 do p["T" .. k] = pk[j]; k = k + 1 end
+    end
+    p.osdPx = math.max(1, math.floor(3 * V.OSDSize * s + 0.5))
+    p.osdX = V.OSDMargin * H * 1.3
+    p.osdTop = V.OSDMargin * H
+    p.osdBot = V.OSDMargin * H
+    if V.Aspect43 > 0.5 then p.osdX = p.osdX + math.max(0, (W - H*4/3) / 2) end
+
+    node:SetParamBlock(p)
+    node:AddSampler("RowSampler", TEX_FILTER_MODE_LINEAR, TEX_ADDRESS_MODE_CLAMP, TEX_NORMALIZED_COORDS_TRUE)
+    node:AddInput("src", src)
+    node:AddInput("org", org)
+    node:AddOutput("dst", dst)
+    local ok = node:RunSession(req)
+    if not ok then
+        dump(node:GetErrorLog())
+        OutImage:Set(req, src)
+        return
+    end
+    OutImage:Set(req, dst)
+end

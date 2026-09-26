@@ -20,6 +20,14 @@
 
 Проверки без Resolve: `luac5.1 -p` для Lua/fuse; ядро компилировать gcc с заглушками макросов.
 
+## VHS Pro (`davinci-plugins/vhs-pro/`) — та же система
+`python3 build_vhs_pro.py` (генератор; берёт помощники из crt-2.0/build_crt_pro_2.py) →
+`python3 render_previews.py` (превью: ядро через gcc на CPU) → `python3 make_release.py` →
+`dist/VHS Pro.zip` + `dist/VHS Pro Demo.zip` (3 пресета, ChromaShift/Snow/LineJitter, Text+ надпись, нода VHSCoreDemo).
+Ядро `vhs_core_template.fuse` (1 проход): камера с рук (Lua считает camX/camY/camR/camS), трекинг, полоса головок,
+залом, пауза/перемотка, размытие Y/IQ по строке, цвет, снег/выпадения, OSD (шрифт `font.inc`, строки упакованы в T0..T17).
+Пути: `Effects/STORYVERSE/VHS/`, Fuses/VHSCore.fuse. Окна пресетов пока нет (только Инспектор).
+
 ## Архив
 - `crt-pro-v1/` — стабильная CRT Pro 1.0, НЕ МЕНЯТЬ.
 - `fuse-uimanager-proto/`, `ofx-proto/` — ранние прототипы.
