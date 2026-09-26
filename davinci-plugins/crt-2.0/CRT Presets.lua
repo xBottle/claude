@@ -127,7 +127,7 @@ end
 local selected = nil     -- { kind = "builtin"/"own", index = i, name = "..." }
 local statusText = ""
 local reopen = true
-local geom = { 200, 100, 390, 860 }
+local geom = { 200, 80, 590, 760 }
 
 while reopen do
     reopen = false
@@ -138,7 +138,7 @@ while reopen do
         items[#items + 1] = { kind = "builtin", index = i - 1, name = n, ico = "preset_" .. (i - 1) }
     end
     for _, n in ipairs(listOwn()) do
-        items[#items + 1] = { kind = "own", name = n, ico = "preset_own" }
+        items[#items + 1] = { kind = "own", name = n, ico = "preset_own", thumb = PRESET_DIR .. n .. ".png" }
     end
 
     local CARD = [[QPushButton { background:#15171c; border:2px solid #2a2e37; border-radius:8px; padding:2px; }
@@ -151,27 +151,55 @@ QPushButton:hover { border-color:#4b8fd6; }]]
     local BLUE, WHITE, GREEN, RED = "#6fb7ff", "#e8e8e8", "#6fdc8c", "#ff7a7a"
 
     local rows = {}
-    for r = 1, #items, 2 do
+    local COLS = 4
+    local function iconFor(it)
+        if it.thumb and bmd.fileexists(it.thumb) then
+            local ok, ic = pcall(function() return ui:Icon{ File = it.thumb } end)
+            if ok and ic then return ic end
+        end
+        return icon(it.ico) or icon("preset_0")
+    end
+    for r = 1, #items, COLS do
         local cells = {}
-        for c = r, math.min(r + 1, #items) do
+        for c = r, math.min(r + COLS - 1, #items) do
             local it = items[c]
             local isSel = selected and selected.name == it.name and selected.kind == it.kind
             cells[#cells + 1] = ui:VGroup{
                 Weight = 1, Spacing = 2,
                 ui:Button{
                     ID = "card_" .. c, Text = "",
-                    Icon = icon(it.ico) or icon("preset_0"),
-                    IconSize = { 150, 84 }, MinimumSize = { 160, 92 }, MaximumSize = { 400, 92 },
+                    Icon = iconFor(it),
+                    IconSize = { 120, 67 }, MinimumSize = { 128, 74 }, MaximumSize = { 128, 74 },
                     ToolTip = it.name, StyleSheet = isSel and CARD_SEL or CARD,
                 },
                 ui:Label{
                     Text = (it.kind == "own" and "★ " or "") .. it.name, Alignment = { AlignHCenter = true },
-                    StyleSheet = "color:#d8dce4; font-weight:bold;",
+                    StyleSheet = "color:#d8dce4; font-weight:bold; font-size:11px;", WordWrap = true,
                 },
             }
         end
-        if #cells == 1 then cells[2] = ui:HGap(160) end
+        while #cells < COLS do cells[#cells + 1] = ui:HGap(128) end
         rows[#rows + 1] = ui:HGroup{ Weight = 0, Spacing = 8, tunpack(cells) }
+    end
+
+    local PAT_NAMES = {}
+    for _, sec in ipairs(DATA.SECTIONS) do
+        for _, c in ipairs(sec.controls) do if c.id == "PixPattern" then PAT_NAMES = c.options end end
+    end
+    local curPat = -1
+    pcall(function() curPat = math.floor((tool:GetInput("PixPattern") or 0) + 0.5) end)
+    local PAT = [[QPushButton { background:#111318; border:2px solid #2a2e37; border-radius:6px; padding:1px; }
+QPushButton:hover { border-color:#4b8fd6; }]]
+    local PAT_SEL = [[QPushButton { background:#111318; border:2px solid #ffb84d; border-radius:6px; padding:1px; }]]
+    local patRows = {}
+    for r = 0, 9, 5 do
+        local cells = {}
+        for i = r, r + 4 do
+            cells[#cells + 1] = ui:Button{ ID = "pat_" .. i, Text = "", Icon = icon("pattern_" .. i),
+                IconSize = { 96, 54 }, MinimumSize = { 104, 60 }, MaximumSize = { 104, 60 },
+                ToolTip = PAT_NAMES[i + 1] or ("Узор " .. i), StyleSheet = (i == curPat) and PAT_SEL or PAT }
+        end
+        patRows[#patRows + 1] = ui:HGroup{ Weight = 0, Spacing = 6, tunpack(cells) }
     end
 
     local win = disp:AddWindow({
@@ -183,7 +211,11 @@ QLineEdit { background:#111318; border:1px solid #333844; border-radius:6px; pad
         ui:VGroup{
             Spacing = 8,
             ui:Label{ Text = "<img src='" .. DIR .. "icons/title.png'>", Alignment = { AlignHCenter = true }, Weight = 0 },
-            ui:VGroup{ Weight = 1, Spacing = 6, tunpack(rows) },
+            ui:VGroup{ Weight = 0, Spacing = 6, tunpack(rows) },
+            ui:Label{ ID = "PatLabel", Weight = 0, StyleSheet = "color:#ffb84d; font-weight:bold; margin-top:6px;",
+                Text = "УЗОР ПИКСЕЛЕЙ" .. ((PAT_NAMES[curPat + 1] and (":  " .. PAT_NAMES[curPat + 1])) or "") },
+            ui:VGroup{ Weight = 0, Spacing = 6, tunpack(patRows) },
+            ui:VGap(0, 1),
             ui:LineEdit{ ID = "NameEdit", PlaceholderText = "Название пресета", Weight = 0,
                 Text = selected and selected.name or "" },
             ui:HGroup{ Weight = 0,
@@ -198,6 +230,7 @@ QLineEdit { background:#111318; border:1px solid #333844; border-radius:6px; pad
                 ui:Button{ ID = "BtnRename", Text = "Переименовать", StyleSheet = btnStyle(WHITE) },
                 ui:Button{ ID = "BtnDelete", Text = "Удалить", StyleSheet = btnStyle(RED) },
             },
+            ui:Button{ ID = "BtnThumb", Text = "Снять превью с текущего кадра (для своего ★)", StyleSheet = btnStyle(WHITE), Weight = 0 },
             ui:Label{ ID = "Status", Text = statusText, Weight = 0, WordWrap = true, StyleSheet = "color:#6fb7ff;" },
             ui:Label{ Text = "CRT Pro v2 · процедурное ядро", Weight = 0, Alignment = { AlignHCenter = true },
                 StyleSheet = "color:#5a606c; font-size:10px;" },
@@ -235,6 +268,16 @@ QLineEdit { background:#111318; border:1px solid #333844; border-radius:6px; pad
         end
     end
 
+    for i = 0, 9 do
+        win.On["pat_" .. i].Clicked = function()
+            pcall(function() tool:SetInput("PixPattern", i) end)
+            pcall(function() tool:SetInput("PixOn", 1) end)
+            for j = 0, 9 do pcall(function() itm["pat_" .. j].StyleSheet = (j == i) and PAT_SEL or PAT end) end
+            itm.PatLabel.Text = "УЗОР ПИКСЕЛЕЙ:  " .. (PAT_NAMES[i + 1] or "")
+            status("Узор: " .. (PAT_NAMES[i + 1] or i))
+        end
+    end
+
     function win.On.BtnLoad.Clicked()
         if selected then apply(selected) else status("Сначала выбери пресет.") end
     end
@@ -250,8 +293,15 @@ QLineEdit { background:#111318; border:1px solid #333844; border-radius:6px; pad
         if name == "" then status("Введи название в поле выше.") return end
         bmd.createdir(PRESET_DIR)
         bmd.writefile(PRESET_DIR .. name .. ".crtpreset", t)
+        -- превью: текущий кадр из вьюера Resolve (Resolve 18+)
+        local shot = false
+        pcall(function()
+            local rs = (Resolve and Resolve()) or bmd.scriptapp("Resolve")
+            local pj = rs:GetProjectManager():GetCurrentProject()
+            shot = pj:ExportCurrentFrameAsStill(PRESET_DIR .. name .. ".png") and true or false
+        end)
         selected = { kind = "own", name = name }
-        statusText = "Сохранён «" .. name .. "»."
+        statusText = "Сохранён «" .. name .. "»" .. (shot and " с превью текущего кадра." or ".")
         restart()
     end
 
@@ -275,14 +325,26 @@ QLineEdit { background:#111318; border:1px solid #333844; border-radius:6px; pad
         if type(t) ~= "table" then status("Не удалось прочитать пресет.") return end
         bmd.writefile(PRESET_DIR .. new .. ".crtpreset", t)
         os.remove(PRESET_DIR .. selected.name .. ".crtpreset")
+        os.rename(PRESET_DIR .. selected.name .. ".png", PRESET_DIR .. new .. ".png")
         statusText = "Переименован в «" .. new .. "»."
         selected = { kind = "own", name = new }
         restart()
     end
 
+    function win.On.BtnThumb.Clicked()
+        if not selected or selected.kind ~= "own" then status("Сначала выбери свой пресет (★).") return end
+        local ok = false
+        pcall(function()
+            local rs = (Resolve and Resolve()) or bmd.scriptapp("Resolve")
+            ok = rs:GetProjectManager():GetCurrentProject():ExportCurrentFrameAsStill(PRESET_DIR .. selected.name .. ".png")
+        end)
+        if ok then statusText = "Превью обновлено."; restart() else status("Не удалось снять кадр: открой клип во вьюере страницы Edit.") end
+    end
+
     function win.On.BtnDelete.Clicked()
         if not selected or selected.kind ~= "own" then status("Удалить можно только свой пресет (★).") return end
         os.remove(PRESET_DIR .. selected.name .. ".crtpreset")
+        os.remove(PRESET_DIR .. selected.name .. ".png")
         statusText = "Удалён «" .. selected.name .. "»."
         selected = nil
         restart()

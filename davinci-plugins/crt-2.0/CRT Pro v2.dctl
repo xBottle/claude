@@ -1,29 +1,24 @@
-// CRT Pro v2 — версия для страницы Color (DCTL, GPU).
-// Установка: файл в папку LUT Resolve (см. README), затем на ноде Color:
-// Эффекты → DCTL → выбрать «CRT Pro v2».
-// Здесь всё в один проход: узор пикселей, строки, сведение, выпуклость,
-// углы, виньетка, глубина цвета, монохром. Свечение — штатным Glow на
-// соседней ноде (в DCTL нет многопроходного размытия).
+// CRT Pro v2 (DCTL, Color page)
 
-DEFINE_UI_PARAMS(PixPattern, Узор, DCTLUI_COMBO_BOX, 0, { P0, P1, P2, P3, P4, P5, P6, P7, P8, P9 }, { Прямые, Со сдвигом, Апертурная решётка, Щелевая маска, Теневая маска, LCD-сетка, LED-стена, Точечная матрица, Сетка без цвета, Только строки })
-DEFINE_UI_PARAMS(RGBMode, Режим RGB, DCTLUI_COMBO_BOX, 0, { M0, M1, M2 }, { Настоящий RGB, Имитация без цвета, Разделение RGB })
-DEFINE_UI_PARAMS(PixSize, Размер пикселя, DCTLUI_SLIDER_FLOAT, 1.0, 0.25, 8.0, 0.01)
-DEFINE_UI_PARAMS(PixDown, Понижать разрешение, DCTLUI_CHECK_BOX, 1)
-DEFINE_UI_PARAMS(PixStrength, Сила маски, DCTLUI_SLIDER_FLOAT, 1.0, 0.0, 1.0, 0.01)
-DEFINE_UI_PARAMS(PixSoft, Мягкость пикселя, DCTLUI_SLIDER_FLOAT, 0.2, 0.0, 1.0, 0.01)
-DEFINE_UI_PARAMS(PixBright, Усиление яркости, DCTLUI_SLIDER_FLOAT, 2.0, 0.0, 4.0, 0.01)
-DEFINE_UI_PARAMS(PixGamma, Гамма пикселей, DCTLUI_SLIDER_FLOAT, 0.635, 0.2, 2.0, 0.01)
-DEFINE_UI_PARAMS(ScanStrength, Строки сила, DCTLUI_SLIDER_FLOAT, 0.0, 0.0, 1.0, 0.01)
-DEFINE_UI_PARAMS(ScanBeam, Строки толщина луча, DCTLUI_SLIDER_FLOAT, 0.6, 0.05, 1.0, 0.01)
-DEFINE_UI_PARAMS(ConvX, Сведение сдвиг RB, DCTLUI_SLIDER_FLOAT, 0.0, -10.0, 10.0, 0.1)
-DEFINE_UI_PARAMS(Curve, Выпуклость экрана, DCTLUI_SLIDER_FLOAT, 0.0, -0.6, 0.6, 0.01)
-DEFINE_UI_PARAMS(Corner, Скруглённые углы, DCTLUI_SLIDER_FLOAT, 0.0, 0.0, 0.5, 0.005)
-DEFINE_UI_PARAMS(Vig, Виньетка, DCTLUI_SLIDER_FLOAT, 0.0, 0.0, 1.0, 0.01)
-DEFINE_UI_PARAMS(Levels, Уровней цвета 0 выкл, DCTLUI_SLIDER_INT, 0, 0, 64, 1)
-DEFINE_UI_PARAMS(Mono, Монохром 0 выкл, DCTLUI_SLIDER_FLOAT, 0.0, 0.0, 1.0, 0.01)
-DEFINE_UI_PARAMS(MonoR, Монохром R, DCTLUI_SLIDER_FLOAT, 0.25, 0.0, 1.0, 0.01)
-DEFINE_UI_PARAMS(MonoG, Монохром G, DCTLUI_SLIDER_FLOAT, 1.0, 0.0, 1.0, 0.01)
-DEFINE_UI_PARAMS(MonoB, Монохром B, DCTLUI_SLIDER_FLOAT, 0.4, 0.0, 1.0, 0.01)
+DEFINE_UI_PARAMS(PixPattern, Pattern, DCTLUI_COMBO_BOX, 0, { P0, P1, P2, P3, P4, P5, P6, P7, P8, P9 }, { Straight, Offset, Aperture Grille, Slot Mask, Shadow Mask, LCD Grid, LED Wall, Dot Matrix, Mono Grid, Lines Only })
+DEFINE_UI_PARAMS(RGBMode, RGB Mode, DCTLUI_COMBO_BOX, 0, { M0, M1, M2 }, { True RGB, Fake RGB, Split RGB })
+DEFINE_UI_PARAMS(PixSize, Pixel Size, DCTLUI_SLIDER_FLOAT, 1.0, 0.25, 8.0, 0.01)
+DEFINE_UI_PARAMS(PixDown, Downscale, DCTLUI_CHECK_BOX, 1)
+DEFINE_UI_PARAMS(PixStrength, Mask Strength, DCTLUI_SLIDER_FLOAT, 1.0, 0.0, 1.0, 0.01)
+DEFINE_UI_PARAMS(PixSoft, Pixel Softness, DCTLUI_SLIDER_FLOAT, 0.2, 0.0, 1.0, 0.01)
+DEFINE_UI_PARAMS(PixBright, Brightness Boost, DCTLUI_SLIDER_FLOAT, 2.0, 0.0, 4.0, 0.01)
+DEFINE_UI_PARAMS(PixGamma, Pixel Gamma, DCTLUI_SLIDER_FLOAT, 0.635, 0.2, 2.0, 0.01)
+DEFINE_UI_PARAMS(ScanStrength, Scanlines, DCTLUI_SLIDER_FLOAT, 0.0, 0.0, 1.0, 0.01)
+DEFINE_UI_PARAMS(ScanBeam, Beam Width, DCTLUI_SLIDER_FLOAT, 0.6, 0.05, 1.0, 0.01)
+DEFINE_UI_PARAMS(ConvX, Convergence, DCTLUI_SLIDER_FLOAT, 0.0, -10.0, 10.0, 0.1)
+DEFINE_UI_PARAMS(Curve, Curvature, DCTLUI_SLIDER_FLOAT, 0.0, -0.6, 0.6, 0.01)
+DEFINE_UI_PARAMS(Corner, Corner Radius, DCTLUI_SLIDER_FLOAT, 0.0, 0.0, 0.5, 0.005)
+DEFINE_UI_PARAMS(Vig, Vignette, DCTLUI_SLIDER_FLOAT, 0.0, 0.0, 1.0, 0.01)
+DEFINE_UI_PARAMS(Levels, Color Levels, DCTLUI_SLIDER_INT, 0, 0, 64, 1)
+DEFINE_UI_PARAMS(Mono, Monochrome, DCTLUI_SLIDER_FLOAT, 0.0, 0.0, 1.0, 0.01)
+DEFINE_UI_PARAMS(MonoR, Mono Red, DCTLUI_SLIDER_FLOAT, 0.25, 0.0, 1.0, 0.01)
+DEFINE_UI_PARAMS(MonoG, Mono Green, DCTLUI_SLIDER_FLOAT, 1.0, 0.0, 1.0, 0.01)
+DEFINE_UI_PARAMS(MonoB, Mono Blue, DCTLUI_SLIDER_FLOAT, 0.4, 0.0, 1.0, 0.01)
 
 __DEVICE__ float cl01(float v) { return _fminf(_fmaxf(v, 0.0f), 1.0f); }
 __DEVICE__ float fract1(float v) { return v - _floor(v); }
@@ -60,7 +55,7 @@ __DEVICE__ float3 transform(int p_Width, int p_Height, int p_X, int p_Y, __TEXTU
         r += (L * MonoR * 1.3f - r) * Mono; g += (L * MonoG * 1.3f - g) * Mono; b += (L * MonoB * 1.3f - b) * Mono;
     }
 
-    /* узор пикселей: ячейка = R | G | B | зазор */
+    /* pixel mask: cell = R | G | B | gap */
     float cx = fx / S, cy = fy / S, col = _floor(cx);
     float ux = fract1(cx), uy = fract1(cy);
     float sft = 0.02f + PixSoft * 0.25f;

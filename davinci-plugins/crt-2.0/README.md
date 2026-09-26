@@ -6,7 +6,7 @@
 |---|---|---|
 | **Edit** | `CRT Pro v2.setting` + ядро `CRTCore.fuse` | Effects Library → Эффекты → Claude → CRT → **CRT Pro v2** |
 | **Fusion** | то же ядро как нода | Shift+Пробел → **CRT Core** |
-| **Color** | `CRT Pro v2.dctl` | нода → Эффекты → **DCTL** → Claude → CRT Pro v2 |
+| **Color** | `CRT Pro v2.dctl` | Color → Effects → ResolveFX Color → **DCTL** на ноду → в списке DCTL выбрать Claude / CRT Pro v2 |
 
 ## Что внутри
 

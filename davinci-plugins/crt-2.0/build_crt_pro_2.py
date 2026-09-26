@@ -1009,14 +1009,16 @@ def build_ctrl_and_inputs(values):
         lab = C(sid, "label", sname, is_open=is_open)
         lab.count = count
         ctrl.val(sid, 1 if is_open else 0)
-        ctrl.user_controls.append(uc_def(lab))
+        _pg = lstr(PAGE_OF[sid])
+        _fix = lambda txt: txt.replace('ICS_ControlPage = "Controls"', "ICS_ControlPage = " + _pg)
+        ctrl.user_controls.append(_fix(uc_def(lab)))
         pg = PAGE_OF[sid]
         page = f'\n\tPage = {lstr(pg)},' if pg != cur_page else ""
         cur_page = pg
         group_inputs.append(f"{sid} = InstanceInput {{\n\tSourceOp = \"Ctrl\",\n\tSource = \"{sid}\",{page}\n}}")
         for c in items:
             if c.kind == "color":
-                ctrl.user_controls += color_defs(c)
+                ctrl.user_controls += [_fix(x) for x in color_defs(c)]
                 for i, ch in enumerate(("Red", "Green", "Blue")):
                     cid = c.id + ch
                     ctrl.val(cid, values[cid])
@@ -1025,7 +1027,7 @@ def build_ctrl_and_inputs(values):
                         f"{cid} = InstanceInput {{\n\tSourceOp = \"Ctrl\",\n\tSource = \"{cid}\",{name}\n"
                         f"\tControlGroup = {COLOR_GROUP},\n\tDefault = {lnum(values[cid])},\n}}")
                 continue
-            ctrl.user_controls.append(uc_def(c))
+            ctrl.user_controls.append(_fix(uc_def(c)))
             extra = ""
             if c.kind == "button":
                 if c.width != 1.0:
