@@ -6,6 +6,7 @@
 Запуск: python3 make_release.py
 """
 import os
+import re
 import shutil
 import zipfile
 import importlib.util
@@ -13,9 +14,10 @@ import importlib.util
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = "CRT Pro v2"            # имя исходников в репозитории
 DIST = os.path.join(HERE, "dist")
-DEMO_FREE = 5                  # сколько пресетов открыто в демо
+DEMO_PRESETS = (0, 1, 3)       # пресеты демо: по умолчанию, классический ТВ, зелёный терминал
+DEMO_KEEP = ("PresetSel", "BtnApply", "PixSize", "PixBright", "PixGamma")
 # Публичные пути (не пересекаются с CRT Pro 1.0 в Claude/CRT)
-CAT, SCR, LUTD = "CRT Pro", "crt-pro", "CRT Pro"
+CAT, SCR, LUTD = "STORYVERSE", "crt-pro", "STORYVERSE"
 
 
 def load_builder(demo=False):
@@ -23,14 +25,22 @@ def load_builder(demo=False):
     m = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(m)
     m.SHARE_MODE = True  # свои пресеты автора в продаваемый пакет не попадают
-    if demo:
-        del m.PRESET_NAMES[DEMO_FREE:]
-        for k in [k for k in m.PRESETS if k >= DEMO_FREE]:
-            del m.PRESETS[k]
-        cut = {"BtnSave", "BtnLoad", "BtnDelete", "BtnCopy", "BtnPaste"}
-        sid, title, opn, items = m.SECTIONS[0]
-        m.SECTIONS[0] = (sid, title, opn, [c for c in items if c.id not in cut])
+    if demo:  # демо: 3 пресета и 4 крутилки, остальное спрятано внутри группы
+        names, pres = m.PRESET_NAMES[:], dict(m.PRESETS)
+        m.PRESET_NAMES[:] = [names[i] for i in DEMO_PRESETS]
+        m.PRESETS.clear()
+        m.PRESETS.update({k: pres[i] for k, i in enumerate(DEMO_PRESETS)})
         m.own_presets = lambda: []
+        orig = m.build_ctrl_and_inputs
+
+        def demo_ctrl(values):
+            ctrl, gin = orig(values)
+            keep = [g for g in gin if g.split(" = ", 1)[0] in ("MainInput1",) + DEMO_KEEP]
+            keep.sort(key=lambda g: (("MainInput1",) + DEMO_KEEP).index(g.split(" = ", 1)[0]))
+            keep = [re.sub(r"\n\tPage = [^\n]*", "", g) for g in keep]
+            keep[1] = keep[1].replace("InstanceInput {", 'InstanceInput {\n\tPage = "Controls",', 1)
+            return ctrl, keep
+        m.build_ctrl_and_inputs = demo_ctrl
     return m
 
 
@@ -225,9 +235,11 @@ def make_store(m):
 
 DEMO_NOTE = """
 ДЕМО-ВЕРСИЯ
-  Это демо «просто попробовать»: на картинке водяной знак CRT PRO DEMO,
-  открыто 5 пресетов из 18, нет своих пресетов и DCTL для страницы Color.
-  Полная версия — без водяного знака и без ограничений.
+  Это демо «просто попробовать»: водяной знак CRT PRO DEMO, 3 пресета
+  и 3 настройки — размер пикселя, яркость, гамма.
+  Полная версия: 18 пресетов, окно пресетов, 10 узоров пикселей, 18 модулей
+  (свечение, строки, выпуклость, послесвечение, помехи…), DCTL для Color,
+  без водяного знака.
 """
 
 
@@ -235,7 +247,7 @@ def fill(txt, name, demo):
     txt = (txt.replace("@NAME@", name).replace("@UNAME@", name.upper())
               .replace("@CAT@", CAT).replace("@SCR@", SCR).replace("@LUT@", LUTD))
     if demo:  # в демо нет DCTL — убираем строки установки Color
-        keys = ("LUT", "Color/*", "Color\\*", "страницы Color", "Для страницы Color")
+        keys = ("Presets", "Страница Color (DCTL)", "ОКНО ПРЕСЕТОВ", "10 узоров", "Вкладки Пиксели", "Color      :", "LUT", "Color/*", "Color\\*", "страницы Color", "Для страницы Color")
         txt = "\n".join(l for l in txt.split("\n") if not any(k in l for k in keys) and l.strip() != "fi")
     return txt
 
@@ -244,28 +256,29 @@ def build_edition(name, demo):
     m = load_builder(demo)
     out = os.path.join(DIST, name)
     P = os.path.join(out, "payload")
-    for d in ("Effect", "Fuses", "Presets/icons") + (() if demo else ("Color",)):
+    for d in ("Effect", "Fuses") + (() if demo else ("Presets/icons", "Color")):
         os.makedirs(os.path.join(P, d), exist_ok=True)
     with open(os.path.join(P, "Effect", name + ".setting"), "w", encoding="utf-8") as f:
         f.write(publicize(m.build_setting(0), name))
     shutil.copy2(os.path.join(HERE, "effect", SRC + ".png"), os.path.join(P, "Effect", name + ".png"))
-    fuse = publicize(strip_lua_comments(m.build_fuse()), "CRT Pro").replace('REGS_Category = "Claude"', 'REGS_Category = "CRT Pro"')
+    fuse = publicize(strip_lua_comments(m.build_fuse()), "CRT Pro").replace('REGS_Category = "Claude"', 'REGS_Category = "STORYVERSE"')
     if demo:
         assert "DEMO_BUILD = false" in fuse
         fuse = fuse.replace("DEMO_BUILD = false", "DEMO_BUILD = true")
     with open(os.path.join(P, "Fuses", "CRTCore.fuse"), "w", encoding="utf-8") as f:
         f.write(fuse)
-    with open(os.path.join(HERE, "CRT Presets.lua"), encoding="utf-8") as f:
-        presets = publicize(f.read(), name)
-    if demo:
-        assert "local DEMO = false" in presets
-        presets = presets.replace("local DEMO = false", "local DEMO = true")
-    with open(os.path.join(P, "Presets", "CRT Presets.lua"), "w", encoding="utf-8") as f:
-        f.write(strip_lua_comments(presets))
-    shutil.copy2(os.path.join(HERE, "crt_pro_data.lua"), os.path.join(P, "Presets"))
-    for fn in os.listdir(os.path.join(HERE, "icons")):
-        if fn.endswith(".png"):
-            shutil.copy2(os.path.join(HERE, "icons", fn), os.path.join(P, "Presets", "icons"))
+    if not demo:
+        with open(os.path.join(HERE, "CRT Presets.lua"), encoding="utf-8") as f:
+            presets = publicize(f.read(), name)
+        if demo:
+            assert "local DEMO = false" in presets
+            presets = presets.replace("local DEMO = false", "local DEMO = true")  # не используется
+        with open(os.path.join(P, "Presets", "CRT Presets.lua"), "w", encoding="utf-8") as f:
+            f.write(strip_lua_comments(presets))
+        shutil.copy2(os.path.join(HERE, "crt_pro_data.lua"), os.path.join(P, "Presets"))
+        for fn in os.listdir(os.path.join(HERE, "icons")):
+            if fn.endswith(".png"):
+                shutil.copy2(os.path.join(HERE, "icons", fn), os.path.join(P, "Presets", "icons"))
     if not demo:
         with open(os.path.join(HERE, SRC + ".dctl"), encoding="utf-8") as f:
             dctl = f.read().replace("CRT Pro v2", "CRT Pro")

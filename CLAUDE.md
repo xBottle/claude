@@ -3,7 +3,7 @@
 ## Главный продукт — CRT Pro v2 (`davinci-plugins/crt-2.0/`)
 
 ПРАВИЛО: после ЛЮБОЙ правки эффекта пересобрать и отдать финальный архив:
-`cd davinci-plugins/crt-2.0 && python3 make_release.py` → `dist/CRT Pro.zip` (полная) и `dist/CRT Pro Demo.zip` (демо: водяной знак DEMO_BUILD в fuse, 5 пресетов, без своих пресетов и DCTL)
+`cd davinci-plugins/crt-2.0 && python3 make_release.py` → `dist/CRT Pro.zip` (полная) и `dist/CRT Pro Demo.zip` (демо: водяной знак, 3 пресета, 3 крутилки — PixSize/PixBright/PixGamma, без окна и DCTL)
 (dist/ в .gitignore; архив отправлять пользователю через SendUserFile).
 
 | Файл | Что это |
@@ -15,7 +15,7 @@
 | `CRT Pro v2.dctl` | упрощённая версия для страницы Color (ASCII-подписи, без времени/размытия) |
 | `icons/` | превью пресетов/узоров — рендер реального ядра на CPU (C-копия ядра, см. историю в git) |
 | `make_release.py` | чистый пакет: payload + установщики macOS/Windows/Linux + README/LICENSE; `dist/Для магазина/` (обложка из `store_assets/`, сетка пресетов, описание) |
-| публичные пути | `Effects/CRT Pro/`, `Scripts/Comp/crt-pro/`, `LUT/CRT Pro/` (make_release.py подменяет пути исходников v2) |
+| публичные пути | `Effects/STORYVERSE/`, `Scripts/Comp/crt-pro/`, `LUT/STORYVERSE/` (make_release.py подменяет пути исходников v2) |
 | `validate_crt_pro.lua` | валидатор (запускается через fuscript на Mac при `--install`) |
 
 Проверки без Resolve: `luac5.1 -p` для Lua/fuse; ядро компилировать gcc с заглушками макросов.
