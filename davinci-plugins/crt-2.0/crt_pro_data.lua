@@ -2,7 +2,7 @@
 return {
   SECTIONS = {
     { id = "SecPresets", title = "Пресеты", open = true, controls = {
-      { id = "BtnWindow", kind = "button", name = "Окно пресетов", action = "window" },
+      { id = "BtnWindow", kind = "button", name = "▣  ОКНО ПРЕСЕТОВ  (открыть / закрыть)", action = "window" },
       { id = "PresetSel", kind = "combo", name = "Пресет", default = 0, options = { "По умолчанию (как в уроке)", "Классический ТВ", "Аркадный автомат", "Зелёный терминал", "Янтарный монитор", "VHS-мечта", "Сломанный телевизор", "Снято на камеру", "Мягкий ретро", "Киберпанк" } },
       { id = "BtnApply", kind = "button", name = "Применить пресет", action = "apply" },
       { id = "BtnSave", kind = "button", name = "Сохранить мой пресет", action = "save" },

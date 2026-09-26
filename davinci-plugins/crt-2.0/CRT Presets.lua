@@ -106,6 +106,33 @@ local function listOwn()
     table.sort(names)
     return names
 end
+-- Список «Пресет» в шаблоне эффекта = встроенные + свои (★), как в 1.0.
+-- Новые пункты видны в эффектах, перетащенных на клип после перезапуска Resolve.
+local TEMPLATE = fusionDir() .. "Templates/Edit/Effects/Claude/CRT/CRT Pro v2.setting"
+local function syncTemplate()
+    local ok = pcall(function()
+        local src = bmd.readfile(TEMPLATE)
+        if type(src) ~= "table" then return end
+        local grp
+        for _, v in pairs(src.Tools) do if type(v) == "table" and v.Tools then grp = v end end
+        local ucs = grp.Tools.Ctrl.UserControls
+        local combo, apply = ucs.PresetSel, ucs.BtnApply
+        for i = #combo, 1, -1 do combo[i] = nil end
+        for _, n in ipairs(DATA.PRESET_NAMES) do combo[#combo + 1] = { CCS_AddString = n } end
+        local quoted = {}
+        for _, n in ipairs(listOwn()) do
+            combo[#combo + 1] = { CCS_AddString = "★ " .. n }
+            quoted[#quoted + 1] = string.format("%q", n)
+        end
+        combo.INP_MaxScale = #combo - 1
+        combo.INP_MaxAllowed = #combo - 1
+        local key = "local USER_" .. "PRESETS = "
+        apply.BTNCS_Execute = apply.BTNCS_Execute:gsub(key .. "%b{}", function() return key .. "{ " .. table.concat(quoted, ", ") .. " }" end, 1)
+        bmd.writefile(TEMPLATE, src)
+    end)
+    return ok
+end
+
 local function builtinValues(i)
     local t = {}
     for k, v in pairs(DATA.DEFAULTS) do t[k] = v end
@@ -114,6 +141,19 @@ local function builtinValues(i)
 end
 
 local ui = FUAPP.UIManager
+
+-- Переключатель: если окно уже открыто — эта кнопка его закрывает.
+local function getD(k) local ok, v = pcall(function() return FUAPP:GetData(k) end); return ok and v or nil end
+local function setD(k, v) pcall(function() FUAPP:SetData(k, v) end) end
+local already = nil
+pcall(function() already = ui:FindWindow("CRTPresetsWin") end)
+if already and getD("CRTPresets.open") then
+    setD("CRTPresets.close", true)
+    pcall(function() already:Hide() end)
+    return
+end
+setD("CRTPresets.open", true)
+setD("CRTPresets.close", nil)
 local disp = bmd.UIDispatcher(ui)
 local tunpack = table.unpack or unpack
 
@@ -124,6 +164,7 @@ local function icon(name)
     return ok and ic or nil
 end
 
+pcall(syncTemplate)
 local selected = nil     -- { kind = "builtin"/"own", index = i, name = "..." }
 local statusText = ""
 local reopen = true
@@ -252,6 +293,7 @@ QLineEdit { background:#111318; border:1px solid #333844; border-radius:6px; pad
         status("Применён «" .. it.name .. "».")
     end
     local function restart()
+        pcall(syncTemplate)
         local ok, g = pcall(function() return win:GetGeometry() end)
         if ok and type(g) == "table" and g[3] then geom = { g[1], g[2], g[3], g[4] } end
         reopen = true
@@ -350,9 +392,22 @@ QLineEdit { background:#111318; border:1px solid #333844; border-radius:6px; pad
         restart()
     end
 
-    function win.On.CRTPresetsWin.Close() disp:ExitLoop() end
+    function win.On.CRTPresetsWin.Close() reopen = false; disp:ExitLoop() end
+    local timer
+    pcall(function()
+        timer = ui:Timer{ ID = "CRTCloseTimer", Interval = 300 }
+        local function tick()
+            if getD("CRTPresets.close") then reopen = false; disp:ExitLoop() end
+        end
+        disp.On.Timeout = tick
+        win.On.CRTCloseTimer.Timeout = tick
+        timer:Start()
+    end)
 
     win:Show()
     disp:RunLoop()
+    if timer then pcall(function() timer:Stop() end) end
     win:Hide()
 end
+setD("CRTPresets.open", nil)
+setD("CRTPresets.close", nil)

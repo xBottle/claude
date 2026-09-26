@@ -87,7 +87,7 @@ PRESET_NAMES = [
 
 SECTIONS = [
     ("SecPresets", "Пресеты", True, [
-        button("BtnWindow", "Окно пресетов", "window"),
+        button("BtnWindow", "▣  ОКНО ПРЕСЕТОВ  (открыть / закрыть)", "window"),
         combo("PresetSel", "Пресет", PRESET_NAMES, 0),
         button("BtnApply", "Применить пресет", "apply"),
         button("BtnSave", "Сохранить мой пресет", "save", 0.5),
@@ -238,7 +238,7 @@ COLOR_GROUP = 40
 
 # Вкладки Инспектора (v2): раздел -> вкладка. Порядок вкладок = порядок здесь.
 PAGES = [
-    ("Главное", ["SecPresets", "SecGlobal"]),
+    ("Controls", ["SecPresets", "SecGlobal"]),  # штатная вкладка «Управление» = наша главная
     ("Пиксели", ["SecPixels", "SecScan", "SecConv"]),
     ("Экран", ["SecScreen", "SecGlow", "SecTube"]),
     ("Цвет", ["SecIn", "SecShift", "SecMono", "SecRes", "SecBleed", "SecOut"]),
