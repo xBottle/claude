@@ -228,6 +228,15 @@ SECTIONS = [
         slider("OutSat", "Насыщенность", 1, 0, 3, 0, 10),
         check("OutClip", "Обрезать 0–1", 0),
     ]),
+    ("SecPhos", "Кинескоп: послесвечение и блик", False, [
+        check("PersistOn", "Послесвечение (след от движения)", 0),
+        slider("PersistAmount", "Длина следа", 0.6, 0, 0.95, 0, 0.99),
+        check("GlareOn", "Блик на стекле", 0),
+        slider("GlareAmount", "Сила блика", 0.35, 0, 1, 0, 3),
+        slider("GlareX", "Блик по X", 0.28, 0, 1, -1, 2),
+        slider("GlareY", "Блик по Y", 0.78, 0, 1, -1, 2),
+        slider("GlareSize", "Размер блика", 0.35, 0.05, 1, 0.01, 3),
+    ]),
     ("SecGlobal", "Общее", False, [
         slider("GlobalMix", "Интенсивность эффекта", 1, 0, 1, 0, 1),
         check("PerfOn", "Замер скорости (в консоль)", 0),
@@ -240,7 +249,7 @@ COLOR_GROUP = 40
 PAGES = [
     ("Controls", ["SecPresets", "SecGlobal"]),  # штатная вкладка «Управление» = наша главная
     ("Пиксели", ["SecPixels", "SecScan", "SecConv"]),
-    ("Экран", ["SecScreen", "SecGlow", "SecTube"]),
+    ("Экран", ["SecScreen", "SecPhos", "SecGlow", "SecTube"]),
     ("Цвет", ["SecIn", "SecShift", "SecMono", "SecRes", "SecBleed", "SecOut"]),
     ("Помехи", ["SecFlick", "SecBand", "SecNoise", "SecShake"]),
 ]

@@ -145,15 +145,20 @@ local ui = FUAPP.UIManager
 -- Переключатель: если окно уже открыто — эта кнопка его закрывает.
 local function getD(k) local ok, v = pcall(function() return FUAPP:GetData(k) end); return ok and v or nil end
 local function setD(k, v) pcall(function() FUAPP:SetData(k, v) end) end
-local already = nil
-pcall(function() already = ui:FindWindow("CRTPresetsWin") end)
-if already and getD("CRTPresets.open") then
-    setD("CRTPresets.close", true)
-    pcall(function() already:Hide() end)
+local MARK_DIR = (os.getenv("TMPDIR") or "/tmp/") .. "/"
+local OPEN_MARK, CLOSE_MARK = MARK_DIR .. "crtpro_presets.open", MARK_DIR .. "crtpro_presets.close"
+local function exists(f) local h = io.open(f, "r"); if h then h:close() return true end return false end
+local function touch(f) local h = io.open(f, "w"); if h then h:write(tostring(os.time())); h:close() end end
+if exists(OPEN_MARK) then
+    -- окно уже открыто: просим его закрыться и выходим (второе нажатие = закрыть)
+    touch(CLOSE_MARK)
+    os.remove(OPEN_MARK)
+    local w; pcall(function() w = ui:FindWindow("CRTPresetsWin") end)
+    if w then pcall(function() w:Hide() end) end
     return
 end
-setD("CRTPresets.open", true)
-setD("CRTPresets.close", nil)
+os.remove(CLOSE_MARK)
+touch(OPEN_MARK)
 local disp = bmd.UIDispatcher(ui)
 local tunpack = table.unpack or unpack
 
@@ -182,14 +187,15 @@ while reopen do
         items[#items + 1] = { kind = "own", name = n, ico = "preset_own", thumb = PRESET_DIR .. n .. ".png" }
     end
 
-    local CARD = [[QPushButton { background:#15171c; border:2px solid #2a2e37; border-radius:8px; padding:2px; }
-QPushButton:hover { border-color:#4b8fd6; }]]
-    local CARD_SEL = [[QPushButton { background:#15171c; border:2px solid #5fd3ff; border-radius:8px; padding:2px; }]]
+    local CARD = [[QPushButton { background:#16171d; border:1px solid #25262e; border-radius:12px; padding:3px; }
+QPushButton:hover { border:1px solid #6d5dfc; background:#1b1c24; }]]
+    local CARD_SEL = [[QPushButton { background:#1d1a33; border:2px solid #8b7bff; border-radius:12px; padding:2px; }]]
     local function btnStyle(color)
-        return "QPushButton { background:#1c1f26; color:" .. color .. "; border:1px solid " .. color ..
-            "; border-radius:6px; padding:7px; font-weight:bold; } QPushButton:hover { background:#252a33; }"
+        return "QPushButton { background:#17181f; color:" .. color .. "; border:1px solid #2b2c36; " ..
+            "border-radius:10px; padding:9px; font-weight:600; } QPushButton:hover { border-color:" .. color ..
+            "; background:#1e1f28; }"
     end
-    local BLUE, WHITE, GREEN, RED = "#6fb7ff", "#e8e8e8", "#6fdc8c", "#ff7a7a"
+    local BLUE, WHITE, GREEN, RED = "#9d8cff", "#e6e7ee", "#5eead4", "#fb7185"
 
     local rows = {}
     local COLS = 4
@@ -215,7 +221,7 @@ QPushButton:hover { border-color:#4b8fd6; }]]
                 },
                 ui:Label{
                     Text = (it.kind == "own" and "★ " or "") .. it.name, Alignment = { AlignHCenter = true },
-                    StyleSheet = "color:#d8dce4; font-weight:bold; font-size:11px;", WordWrap = true,
+                    StyleSheet = "color:#b9bbc7; font-size:11px;", WordWrap = true,
                 },
             }
         end
@@ -229,9 +235,9 @@ QPushButton:hover { border-color:#4b8fd6; }]]
     end
     local curPat = -1
     pcall(function() curPat = math.floor((tool:GetInput("PixPattern") or 0) + 0.5) end)
-    local PAT = [[QPushButton { background:#111318; border:2px solid #2a2e37; border-radius:6px; padding:1px; }
-QPushButton:hover { border-color:#4b8fd6; }]]
-    local PAT_SEL = [[QPushButton { background:#111318; border:2px solid #ffb84d; border-radius:6px; padding:1px; }]]
+    local PAT = [[QPushButton { background:#101116; border:1px solid #25262e; border-radius:10px; padding:2px; }
+QPushButton:hover { border:1px solid #22d3ee; }]]
+    local PAT_SEL = [[QPushButton { background:#0f2230; border:2px solid #22d3ee; border-radius:10px; padding:1px; }]]
     local patRows = {}
     for r = 0, 9, 5 do
         local cells = {}
@@ -245,22 +251,23 @@ QPushButton:hover { border-color:#4b8fd6; }]]
 
     local win = disp:AddWindow({
         ID = "CRTPresetsWin",
-        WindowTitle = "CRT Pro v2 — Пресеты",
+        WindowTitle = "CRT PRO v2",
         Geometry = geom,
-        StyleSheet = [[QWidget { background:#181a20; color:#d8dce4; font-size:12px; }
-QLineEdit { background:#111318; border:1px solid #333844; border-radius:6px; padding:7px; font-size:13px; }]],
+        StyleSheet = [[QWidget { background:#0e0f14; color:#e6e7ee; font-size:12px; }
+QLineEdit { background:#15161c; border:1px solid #2b2c36; border-radius:10px; padding:9px; font-size:13px; color:#e6e7ee; }
+QLineEdit:focus { border:1px solid #8b7bff; }]],
         ui:VGroup{
             Spacing = 8,
             ui:Label{ Text = "<img src='" .. DIR .. "icons/title.png'>", Alignment = { AlignHCenter = true }, Weight = 0 },
             ui:VGroup{ Weight = 0, Spacing = 6, tunpack(rows) },
-            ui:Label{ ID = "PatLabel", Weight = 0, StyleSheet = "color:#ffb84d; font-weight:bold; margin-top:6px;",
-                Text = "УЗОР ПИКСЕЛЕЙ" .. ((PAT_NAMES[curPat + 1] and (":  " .. PAT_NAMES[curPat + 1])) or "") },
+            ui:Label{ ID = "PatLabel", Weight = 0, StyleSheet = "color:#22d3ee; font-weight:600; letter-spacing:1px; margin-top:8px;",
+                Text = "УЗОР ПИКСЕЛЕЙ" .. ((PAT_NAMES[curPat + 1] and ("  ·  " .. PAT_NAMES[curPat + 1])) or "") },
             ui:VGroup{ Weight = 0, Spacing = 6, tunpack(patRows) },
             ui:VGap(0, 1),
             ui:LineEdit{ ID = "NameEdit", PlaceholderText = "Название пресета", Weight = 0,
                 Text = selected and selected.name or "" },
             ui:HGroup{ Weight = 0,
-                ui:Button{ ID = "BtnLoad", Text = "Применить", StyleSheet = btnStyle(BLUE) },
+                ui:Button{ ID = "BtnLoad", Text = "Сбросить всё", StyleSheet = btnStyle(WHITE) },
                 ui:Button{ ID = "BtnCopy", Text = "Скопировать код", StyleSheet = btnStyle(WHITE) },
             },
             ui:HGroup{ Weight = 0,
@@ -272,9 +279,9 @@ QLineEdit { background:#111318; border:1px solid #333844; border-radius:6px; pad
                 ui:Button{ ID = "BtnDelete", Text = "Удалить", StyleSheet = btnStyle(RED) },
             },
             ui:Button{ ID = "BtnThumb", Text = "Снять превью с текущего кадра (для своего ★)", StyleSheet = btnStyle(WHITE), Weight = 0 },
-            ui:Label{ ID = "Status", Text = statusText, Weight = 0, WordWrap = true, StyleSheet = "color:#6fb7ff;" },
-            ui:Label{ Text = "CRT Pro v2 · процедурное ядро", Weight = 0, Alignment = { AlignHCenter = true },
-                StyleSheet = "color:#5a606c; font-size:10px;" },
+            ui:Label{ ID = "Status", Text = statusText, Weight = 0, WordWrap = true, StyleSheet = "color:#9d8cff;" },
+            ui:Label{ Text = "CRT PRO v2  ·  GPU procedural core", Weight = 0, Alignment = { AlignHCenter = true },
+                StyleSheet = "color:#4a4c58; font-size:10px; letter-spacing:1px;" },
         },
     })
     local itm = win:GetItems()
@@ -315,13 +322,17 @@ QLineEdit { background:#111318; border:1px solid #333844; border-radius:6px; pad
             pcall(function() tool:SetInput("PixPattern", i) end)
             pcall(function() tool:SetInput("PixOn", 1) end)
             for j = 0, 9 do pcall(function() itm["pat_" .. j].StyleSheet = (j == i) and PAT_SEL or PAT end) end
-            itm.PatLabel.Text = "УЗОР ПИКСЕЛЕЙ:  " .. (PAT_NAMES[i + 1] or "")
+            itm.PatLabel.Text = "УЗОР ПИКСЕЛЕЙ  ·  " .. (PAT_NAMES[i + 1] or "")
             status("Узор: " .. (PAT_NAMES[i + 1] or i))
         end
     end
 
     function win.On.BtnLoad.Clicked()
-        if selected then apply(selected) else status("Сначала выбери пресет.") end
+        applyTable(builtinValues(0), "сброс")
+        pcall(function() tool:SetInput("PresetSel", 0) end)
+        selected = nil
+        for c2 = 1, #items do pcall(function() itm["card_" .. c2].StyleSheet = CARD end) end
+        status("Все настройки сброшены к значениям по умолчанию.")
     end
 
     function win.On.BtnCopy.Clicked()
@@ -397,7 +408,7 @@ QLineEdit { background:#111318; border:1px solid #333844; border-radius:6px; pad
     pcall(function()
         timer = ui:Timer{ ID = "CRTCloseTimer", Interval = 300 }
         local function tick()
-            if getD("CRTPresets.close") then reopen = false; disp:ExitLoop() end
+            if exists(CLOSE_MARK) then reopen = false; disp:ExitLoop() end
         end
         disp.On.Timeout = tick
         win.On.CRTCloseTimer.Timeout = tick
@@ -409,5 +420,5 @@ QLineEdit { background:#111318; border:1px solid #333844; border-radius:6px; pad
     if timer then pcall(function() timer:Stop() end) end
     win:Hide()
 end
-setD("CRTPresets.open", nil)
-setD("CRTPresets.close", nil)
+os.remove(OPEN_MARK)
+os.remove(CLOSE_MARK)

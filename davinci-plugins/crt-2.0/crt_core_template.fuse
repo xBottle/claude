@@ -23,7 +23,7 @@ FuRegisterClass("CRTCore", CT_Tool, {
 CRTParams = [[
     float w; float h; float cell; float stage;
 __PARAM_FIELDS__
-    float shakeU; float shakeV; float flickN; float bandY; float seed; float period;
+    float shakeU; float shakeV; float flickN; float bandY; float seed; float period; float hasPrev;
 ]]
 
 CRTKernel = [[
@@ -55,7 +55,7 @@ __DEVICE__ float dot1(float dx, float dy, float r, float s) {
     return 1.0f - sstep(r - s, r + s, d);
 }
 
-__KERNEL__ void CRTKernel(__CONSTANTREF__ CRTParams *p, __TEXTURE2D__ src, __TEXTURE2D__ org, __TEXTURE2D_WRITE__ dst)
+__KERNEL__ void CRTKernel(__CONSTANTREF__ CRTParams *p, __TEXTURE2D__ src, __TEXTURE2D__ org, __TEXTURE2D__ prv, __TEXTURE2D_WRITE__ dst)
 {
     DEFINE_KERNEL_ITERATORS_XY(x, y);
     if (x >= (int)p->w || y >= (int)p->h) return;
@@ -211,6 +211,13 @@ __KERNEL__ void CRTKernel(__CONSTANTREF__ CRTParams *p, __TEXTURE2D__ src, __TEX
         float4 c = _tex2DVecN(src, u, v, 15);
         r = c.x * inside; g = c.y * inside; b = c.z * inside; a = c.w * inside;
 
+        /* послесвечение люминофора: яркое прошлого кадра гаснет, а не исчезает сразу */
+        if (p->PersistOn > 0.5f && p->hasPrev > 0.5f) {
+            float4 q = _tex2DVecN(prv, u, v, 15);
+            float k = p->PersistAmount * inside;
+            r = _fmaxf(r, q.x * k); g = _fmaxf(g, q.y * k); b = _fmaxf(b, q.z * k);
+        }
+
         if (p->ColorResOn > 0.5f) {
             float L = _fmaxf(p->ColorLevels, 2.0f);
             r = _floor(r * L + 0.5f) / L; g = _floor(g * L + 0.5f) / L; b = _floor(b * L + 0.5f) / L;
@@ -260,6 +267,17 @@ __KERNEL__ void CRTKernel(__CONSTANTREF__ CRTParams *p, __TEXTURE2D__ src, __TEX
             float m = 1.0f - sstep(-p->CornerSoft, p->CornerSoft + 1e-4f, d);
             r *= m; g *= m; b *= m;
         }
+        /* блик на стекле: мягкое отражение + лёгкий градиент по выпуклости */
+        if (p->GlareOn > 0.5f) {
+            float asp = W / H;
+            float dx = (u - p->GlareX) * asp, dy = v - p->GlareY;
+            float sz = _fmaxf(p->GlareSize, 0.01f);
+            float spot = 1.0f - sstep(0.0f, sz, _sqrtf(dx * dx * 0.55f + dy * dy * 1.6f));
+            float sheen = cl01(1.0f - _fabs((u - 0.5f) * 1.4f + (v - 0.5f) * 0.9f - 0.35f) * 2.2f) * 0.25f;
+            float gl = (spot * spot + sheen) * p->GlareAmount * inside;
+            r += gl * (1.0f - r * 0.5f); g += gl * (1.0f - g * 0.5f); b += gl * 1.05f * (1.0f - b * 0.5f);
+        }
+
         /* цвет на выходе */
         r = gradeCh(r, p->OutGain, p->OutLift, p->OutGamma, p->OutContrast);
         g = gradeCh(g, p->OutGain, p->OutLift, p->OutGamma, p->OutContrast);
@@ -341,6 +359,14 @@ __READ_INPUTS__
     node:AddSampler("RowSampler", TEX_FILTER_MODE_LINEAR, TEX_ADDRESS_MODE_CLAMP, TEX_NORMALIZED_COORDS_TRUE)
     node:AddInput("src", src)
     node:AddInput("org", org)
+    -- предыдущий кадр нужен только для послесвечения (на 2-м проходе)
+    local prv = nil
+    if stage > 0.5 and (V.PersistOn or 0) > 0.5 then
+        pcall(function() prv = InImage:GetSource(req.Time - 1, req:GetFlags()) end)
+    end
+    p.hasPrev = prv and 1 or 0
+    node:SetParamBlock(p)
+    node:AddInput("prv", prv or src)
     node:AddOutput("dst", dst)
     local t0 = os.clock()
     local ok = node:RunSession(req)
