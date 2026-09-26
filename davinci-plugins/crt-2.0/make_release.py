@@ -259,13 +259,21 @@ def build_edition(name, demo):
     for d in ("Effect", "Fuses") + (() if demo else ("Presets/icons", "Color")):
         os.makedirs(os.path.join(P, d), exist_ok=True)
     with open(os.path.join(P, "Effect", name + ".setting"), "w", encoding="utf-8") as f:
-        f.write(publicize(m.build_setting(0), name))
+        st = publicize(m.build_setting(0), name)
+        f.write(st.replace("Fuse.CRTCore", "Fuse.CRTCoreDemo") if demo else st)
     shutil.copy2(os.path.join(HERE, "effect", SRC + ".png"), os.path.join(P, "Effect", name + ".png"))
     fuse = publicize(strip_lua_comments(m.build_fuse()), "CRT Pro").replace('REGS_Category = "Claude"', 'REGS_Category = "STORYVERSE"')
     if demo:
         assert "DEMO_BUILD = false" in fuse
-        fuse = fuse.replace("DEMO_BUILD = false", "DEMO_BUILD = true")
-    with open(os.path.join(P, "Fuses", "CRTCore.fuse"), "w", encoding="utf-8") as f:
+        # своё имя ноды и ядра: полная версия не перезапишет демо, Resolve не возьмёт ядро из кэша
+        fuse = (fuse.replace("DEMO_BUILD = false", "DEMO_BUILD = true")
+                    .replace("p.demo = DEMO_BUILD and 1 or 0", "p.demo = 1")
+                    .replace('FuRegisterClass("CRTCore"', 'FuRegisterClass("CRTCoreDemo"')
+                    .replace('REGS_Name = "CRT Core"', 'REGS_Name = "CRT Core Demo"')
+                    .replace('"CRTKernel"', '"CRTKernelDemo"')
+                    .replace("void CRTKernel(", "void CRTKernelDemo("))
+        assert "CRTCoreDemo" in fuse and "CRTKernelDemo" in fuse and "p.demo = 1" in fuse
+    with open(os.path.join(P, "Fuses", "CRTCoreDemo.fuse" if demo else "CRTCore.fuse"), "w", encoding="utf-8") as f:
         f.write(fuse)
     if not demo:
         with open(os.path.join(HERE, "CRT Presets.lua"), encoding="utf-8") as f:
