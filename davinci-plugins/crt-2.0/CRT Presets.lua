@@ -167,7 +167,7 @@ local page = 1
 local PER_PAGE = 15     -- { kind = "builtin"/"own", index = i, name = "..." }
 local statusText = ""
 local reopen = true
-local geom = { 200, 60, 640, 820 }
+local geom = { 200, 60, 620, 860 }
 
 while reopen do
     reopen = false
@@ -202,30 +202,11 @@ QPushButton:hover { border:1px solid #6d5dfc; background:#1b1c24; }]]
     end
     local pages = math.max(1, math.ceil(#items / PER_PAGE))
     if page > pages then page = pages end
-    -- 15 постоянных ячеек: при листании меняется только их содержимое (окно не пересоздаётся)
-    local CARD_EMPTY = [[QPushButton { background:transparent; border:1px dashed #1c1d24; border-radius:12px; }]]
-    local function isSelected(it) return it and selected and selected.name == it.name and selected.kind == it.kind end
-    local function itemAt(k) return items[(page - 1) * PER_PAGE + k] end
-    for r = 1, PER_PAGE, COLS do
-        local cells = {}
-        for k = r, r + COLS - 1 do
-            local it = itemAt(k)
-            cells[#cells + 1] = ui:VGroup{
-                Weight = 1, Spacing = 2,
-                ui:Button{
-                    ID = "card_" .. k, Text = "", Icon = it and iconFor(it) or nil,
-                    IconSize = { 104, 58 }, MinimumSize = { 112, 64 }, MaximumSize = { 112, 64 },
-                    ToolTip = it and it.name or "", StyleSheet = it and (isSelected(it) and CARD_SEL or CARD) or CARD_EMPTY,
-                },
-                ui:Label{
-                    ID = "cardlbl_" .. k, Alignment = { AlignHCenter = true },
-                    Text = it and ((it.kind == "own" and "★ " or "") .. it.name) or "",
-                    StyleSheet = "color:#b9bbc7; font-size:11px;", WordWrap = true,
-                },
-            }
-        end
-        rows[#rows + 1] = ui:HGroup{ Weight = 0, Spacing = 8, tunpack(cells) }
-    end
+    -- Список-плитка с прокруткой: Tree на 3 колонки, в каждой ячейке превью + подпись.
+    local LCOLS = 3
+    local function label(it) return (it.kind == "own" and "★ " or "") .. it.name end
+    local byLabel = {}
+    for _, it in ipairs(items) do byLabel[label(it)] = it end
 
     local PAT_NAMES = {}
     for _, sec in ipairs(DATA.SECTIONS) do
@@ -257,13 +238,16 @@ QLineEdit:focus { border:1px solid #8b7bff; }]],
         ui:VGroup{
             Spacing = 8,
             ui:Label{ Text = "<img src='" .. DIR .. "icons/title.png'>", Alignment = { AlignHCenter = true }, Weight = 0 },
-            ui:VGroup{ Weight = 0, Spacing = 6, tunpack(rows) },
-            ui:HGroup{ Weight = 0,
-                ui:Button{ ID = "PgPrev", Text = "◀", MaximumSize = { 60, 34 }, StyleSheet = btnStyle(WHITE) },
-                ui:Label{ ID = "PgLabel", Text = string.format("%d / %d   ·   %d пресетов", page, pages, #items),
-                    Alignment = { AlignHCenter = true, AlignVCenter = true }, StyleSheet = "color:#8a8c99;" },
-                ui:Button{ ID = "PgNext", Text = "▶", MaximumSize = { 60, 34 }, StyleSheet = btnStyle(WHITE) },
-            },
+            ui:Tree{ ID = "PresetList", Weight = 1, MinimumSize = { 560, 330 },
+                IconSize = { 160, 90 }, HeaderHidden = true, RootIsDecorated = false,
+                SelectionMode = "SingleSelection", ColumnCount = LCOLS, UniformRowHeights = true,
+                StyleSheet = [[QTreeWidget { background:#0e0f14; border:1px solid #25262e; border-radius:12px; padding:6px; outline:0; }
+QTreeWidget::item { color:#b9bbc7; padding:6px 2px 10px 2px; border-radius:10px; }
+QTreeWidget::item:hover { background:#1b1c24; }
+QTreeWidget::item:selected { background:#221d3d; color:#ffffff; }
+QScrollBar:vertical { background:#0e0f14; width:8px; }
+QScrollBar::handle:vertical { background:#34353f; border-radius:4px; min-height:30px; }
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height:0; }]] },
             ui:Label{ ID = "PatLabel", Weight = 0, StyleSheet = "color:#22d3ee; font-weight:600; letter-spacing:1px; margin-top:8px;",
                 Text = "УЗОР ПИКСЕЛЕЙ" .. ((PAT_NAMES[curPat + 1] and ("  ·  " .. PAT_NAMES[curPat + 1])) or "") },
             ui:VGroup{ Weight = 0, Spacing = 6, tunpack(patRows) },
@@ -312,51 +296,31 @@ QLineEdit:focus { border:1px solid #8b7bff; }]],
     end
 
     -- клик по карточке: выбрать и сразу применить
-    -- обновить одну ячейку под текущую страницу
-    local function fillSlot(k)
-        local it = itemAt(k)
-        pcall(function()
-            itm["card_" .. k].Icon = it and iconFor(it) or ui:Icon{}
-            itm["card_" .. k].ToolTip = it and it.name or ""
-            itm["card_" .. k].StyleSheet = it and (isSelected(it) and CARD_SEL or CARD) or CARD_EMPTY
-            itm["card_" .. k].Enabled = it ~= nil
-            itm["cardlbl_" .. k].Text = it and ((it.kind == "own" and "★ " or "") .. it.name) or ""
-        end)
-    end
-    -- «волна»: карточки обновляются по очереди с шагом ~25 мс; без таймера — сразу все
-    local waveK, waveTimer = 0, nil
-    pcall(function() waveTimer = ui:Timer{ ID = "WaveTimer", Interval = 25 } end)
-    local function waveStep()
-        waveK = waveK + 1
-        if waveK > PER_PAGE then pcall(function() waveTimer:Stop() end) return end
-        fillSlot(waveK)
-    end
-    local function showPage(np)
-        if np < 1 or np > pages or np == page then return end
-        page = np
-        pcall(function() itm.PgLabel.Text = string.format("%d / %d   ·   %d пресетов", page, pages, #items) end)
-        for k = 1, PER_PAGE do  -- мгновенно «гасим» старое
-            pcall(function() itm["card_" .. k].StyleSheet = CARD_EMPTY; itm["cardlbl_" .. k].Text = "" end)
-        end
-        local ok = waveTimer and pcall(function()
-            win.On.WaveTimer.Timeout = waveStep
-            waveK = 0; waveTimer:Start()
-        end)
-        if not ok then for k = 1, PER_PAGE do fillSlot(k) end end
-    end
-    function win.On.PgPrev.Clicked() showPage(page - 1) end
-    function win.On.PgNext.Clicked() showPage(page + 1) end
-    for k = 1, PER_PAGE do
-        win.On["card_" .. k].Clicked = function()
-            local it = itemAt(k)
-            if not it then return end
-            for k2 = 1, PER_PAGE do
-                pcall(function() if itemAt(k2) then itm["card_" .. k2].StyleSheet = (k2 == k) and CARD_SEL or CARD end end)
+    -- заполнить плитку
+    pcall(function()
+        local tr = itm.PresetList
+        pcall(function() tr:SetIconSize({ 160, 90 }) end)
+        for c = 0, LCOLS - 1 do pcall(function() tr:SetColumnWidth(c, 180) end) end
+        for r = 1, #items, LCOLS do
+            local row = tr:NewItem()
+            for c = 0, LCOLS - 1 do
+                local it = items[r + c]
+                if it then
+                    row.Text[c] = label(it)
+                    row.Icon[c] = iconFor(it)
+                    pcall(function() row.TextAlignment[c] = { AlignHCenter = true, AlignBottom = true } end)
+                end
             end
-            selected = it
-            itm.NameEdit.Text = it.name
-            apply(it)
+            tr:AddTopLevelItem(row)
         end
+    end)
+    function win.On.PresetList.ItemClicked(ev)
+        local txt = ev.item and ev.item.Text[ev.column or 0]
+        local it = txt and byLabel[txt]
+        if not it then return end
+        selected = it
+        itm.NameEdit.Text = it.name
+        apply(it)
     end
 
     for i = 0, 9 do
@@ -373,7 +337,6 @@ QLineEdit:focus { border:1px solid #8b7bff; }]],
         applyTable(builtinValues(0), "сброс")
         pcall(function() tool:SetInput("PresetSel", 0) end)
         selected = nil
-        for k2 = 1, PER_PAGE do pcall(function() if itemAt(k2) then itm["card_" .. k2].StyleSheet = CARD end end) end
         status("Все настройки сброшены к значениям по умолчанию.")
     end
 
@@ -448,7 +411,6 @@ QLineEdit:focus { border:1px solid #8b7bff; }]],
     function win.On.CRTPresetsWin.Close() reopen = false; disp:ExitLoop() end
     win:Show()
     disp:RunLoop()
-    if waveTimer then pcall(function() waveTimer:Stop() end) end
     win:Hide()
 end
 os.remove(OPEN_MARK)

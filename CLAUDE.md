@@ -10,7 +10,7 @@
 |---|---|
 | `build_crt_pro_2.py` | генератор: SECTIONS (все контролы), PRESETS (18), PAGES/TAB_NOTES (вкладки Инспектора), цепочка нод, `.setting` + `.fuse` |
 | `crt_core_template.fuse` | GPU-ядро (DVIPComputeNode), 2 прохода: Stage 0 цвет/пиксели/строки/сведение, Stage 1 выпуклость/полоса/мерцание/виньетка/зерно/углы/блик/послесвечение/микс. Править шаблон, не `effect/CRTCore.fuse` |
-| `CRT Presets.lua` | окно пресетов (UIManager): 15 постоянных ячеек + листание «волной», узоры, свои пресеты с превью (`ExportCurrentFrameAsStill`), синхронизация списка в шаблоне |
+| `CRT Presets.lua` | окно пресетов (UIManager): плитка пресетов на ui:Tree (3 колонки, своя прокрутка), узоры, свои пресеты с превью (`ExportCurrentFrameAsStill`), синхронизация списка в шаблоне |
 | `crt_pro_data.lua` | данные для окна: `python3 gen_data.py build_crt_pro_2.py` после правок генератора |
 | `CRT Pro v2.dctl` | упрощённая версия для страницы Color (ASCII-подписи, без времени/размытия) |
 | `icons/` | превью пресетов/узоров — рендер реального ядра на CPU (C-копия ядра, см. историю в git) |
