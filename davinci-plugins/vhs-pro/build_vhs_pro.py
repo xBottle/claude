@@ -39,6 +39,7 @@ PRESET_NAMES = [
 
 SECTIONS = [
     ("SecPresets", "Пресеты", True, [
+        button("BtnWindow", "▣  ОКНО ПРЕСЕТОВ", "window"),
         combo("PresetSel", "Пресет", PRESET_NAMES, 0),
         button("BtnApply", "Применить пресет", "apply"),
         button("BtnSave", "Сохранить мой пресет", "save", 0.5),
@@ -204,6 +205,28 @@ def _vhs_lua(txt):
 
 LUA_COMMON = _vhs_lua(L.LUA_COMMON)
 LUA_ACTIONS = {k: _vhs_lua(v) for k, v in L.LUA_ACTIONS.items() if k != "window"}
+LUA_ACTIONS["window"] = r'''
+local script = FU .. "Scripts/Comp/vhs-pro/VHS Presets.lua"
+if not bmd.fileexists(script) then say("VHS Pro", "Не найдено окно пресетов:\n" .. script) return end
+_G.VHS_TOOL = tool
+local ok, err = pcall(dofile, script)
+_G.VHS_TOOL = nil
+if not ok then say("VHS Pro", "Ошибка окна пресетов: " .. tostring(err)) end
+'''
+
+
+def write_data():
+    """vhs_pro_data.lua — пресеты для окна (чтобы не расходились с эффектом)."""
+    out = ["-- Автосгенерировано build_vhs_pro.py — не редактировать руками.", "return {"]
+    out.append("  PRESET_NAMES = { " + ", ".join(lstr(n) for n in PRESET_NAMES) + " },")
+    out.append("  DEFAULTS = { " + ", ".join(f"{k} = {lnum(v)}" for k, v in DEFAULTS.items()) + " },")
+    out.append("  PRESETS = {")
+    for i, p in PRESETS.items():
+        out.append(f"    [{i}] = {{ " + ", ".join(f"{k} = {lnum(v)}" for k, v in p.items()) + " },")
+    out.append("  },")
+    out.append("}")
+    with open(os.path.join(HERE, "vhs_pro_data.lua"), "w", encoding="utf-8") as f:
+        f.write("\n".join(out) + "\n")
 
 
 def lua_presets():
@@ -353,6 +376,7 @@ def main():
         f.write(build_setting(0))
     with open(os.path.join(HERE, "VHSCore.fuse"), "w", encoding="utf-8") as f:
         f.write(build_fuse())
+    write_data()
     print("собрано:", NAME + ".setting", "VHSCore.fuse", f"({len(value_ids())} параметров, {len(PRESETS)} пресетов)")
 
 

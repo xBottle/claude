@@ -26,7 +26,11 @@
 `dist/VHS Pro.zip` + `dist/VHS Pro Demo.zip` (3 пресета, ChromaShift/Snow/LineJitter, Text+ надпись, нода VHSCoreDemo).
 Ядро `vhs_core_template.fuse` (1 проход): камера с рук (Lua считает camX/camY/camR/camS), трекинг, полоса головок,
 залом, пауза/перемотка, размытие Y/IQ по строке, цвет, снег/выпадения, OSD (шрифт `font.inc`, строки упакованы в T0..T17).
-Пути: `Effects/STORYVERSE/VHS/`, Fuses/VHSCore.fuse. Окна пресетов пока нет (только Инспектор).
+Окно пресетов `VHS Presets.lua` (копия окна CRT: вместо узоров — кнопки режима магнитофона и быстрые тумблеры), данные `vhs_pro_data.lua` пишет build_vhs_pro.py.
+Пути: `Effects/STORYVERSE/VHS/`, Fuses/VHSCore.fuse, `Scripts/Comp/vhs-pro/`. В демо окна нет.
+
+## Отложенные правки (заказчик просил запомнить)
+- В окна пресетов (CRT и VHS) добавить брендинг STORYVERSE (напр. «by STORYVERSE» в шапке/подвале) — сделать вместе, когда вернёмся к CRT.
 
 ## Архив
 - `crt-pro-v1/` — стабильная CRT Pro 1.0, НЕ МЕНЯТЬ.

@@ -153,7 +153,30 @@ def render(exe, tmp, preset, t):
     return Image.fromarray((np.clip(o, 0, 1) * 255).astype(np.uint8)).transpose(Image.FLIP_TOP_BOTTOM)
 
 
+def make_title(path):
+    """Шапка окна пресетов 330x64 — в стиле CRT Pro."""
+    W2, H2 = 330, 64
+    im = Image.new("RGB", (W2, H2), (14, 15, 20))
+    mask = Image.new("L", (W2, H2), 0)
+    ImageDraw.Draw(mask).text((8, 2), "VHS PRO", font=ImageFont.truetype(
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 36), fill=255)
+    grad = Image.new("RGB", (W2, H2))
+    for x in range(W2):
+        t = min(1, x / 190)
+        c = (int(255 * (1 - t) + 34 * t), int(90 * (1 - t) + 211 * t), int(170 * (1 - t) + 238 * t))
+        grad.paste(c, (x, 0, x + 1, H2))
+    im.paste(grad, (0, 0), mask)
+    d = ImageDraw.Draw(im)
+    d.rounded_rectangle([232, 12, 322, 36], radius=12, fill=(29, 26, 51), outline=(139, 123, 255), width=1)
+    d.text((277, 24), "PRESETS", font=ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 11),
+           fill=(230, 231, 238), anchor="mm")
+    d.text((10, 50), "GPU · tape · camcorder", font=ImageFont.truetype(
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 11), fill=(90, 92, 104))
+    im.save(path)
+
+
 def main():
+    make_title(os.path.join(HERE, "icons", "title.png"))
     tmp = tempfile.mkdtemp(prefix="vhs-")
     exe = compile_kernel(tmp)
     os.makedirs(os.path.join(HERE, "icons"), exist_ok=True)

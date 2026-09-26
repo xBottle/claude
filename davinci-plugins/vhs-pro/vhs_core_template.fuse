@@ -136,15 +136,35 @@ __KERNEL__ void VHSKernel(__CONSTANTREF__ VHSParams *p, __TEXTURE2D__ src, __TEX
 
     /* 5. снег, цветной шум, выпадения */
     if (p->NoiseOn > 0.5f) {
-        Y += (hash3(fx * 0.37f, fy * 0.61f, seed) - 0.5f) * p->Snow * 0.6f;
+        /* снег: зерно вытянуто вдоль строки (как у кассеты), сильнее в тенях */
+        float gxn = fx / (2.5f * s), gi = _floor(gxn), gf = gxn - gi;
+        gf = gf * gf * (3.0f - 2.0f * gf);
+        float n1 = hash3(gi, line, seed), n2 = hash3(gi + 1.0f, line, seed);
+        float sn = n1 + (n2 - n1) * gf - 0.5f;
+        float fine = hash3(fx * 0.37f, fy * 0.61f, seed) - 0.5f;
+        Y += (sn * 0.75f + fine * 0.35f) * p->Snow * 0.8f * (1.15f - 0.6f * cl01(Y));
         float cn = _floor(fx / (6.0f * s));
         I2 += (hash3(cn, line, seed + 5.0f) - 0.5f) * p->ChromaNoise * 0.25f;
         Q2 += (hash3(cn, line, seed + 9.0f) - 0.5f) * p->ChromaNoise * 0.25f;
-        if (hash3(line, seed, 6.0f) > 1.0f - p->Dropouts * 0.015f) {
-            float st = hash3(line, seed, 7.0f) * W, ln = (20.0f + 280.0f * hash3(line, seed, 8.0f)) * s;
-            if (fx > st && fx < st + ln) {
-                float tp = 1.0f - (fx - st) / ln;
-                Y += (1.0f - Y) * 0.85f * tp; I2 *= 1.0f - tp; Q2 *= 1.0f - tp;
+        /* выпадения: «комета» — яркая голова и затухающий хвост, живут 2 кадра,
+           собираются в зоны, мягкие по вертикали; иногда тёмные */
+        float dseed = _floor(seed * 0.5f);
+        float zone = 0.5f + 0.5f * _sinf(fy / H * 9.0f + p->sec * 0.7f);
+        float chance = p->Dropouts * 0.02f * (0.35f + 1.3f * zone * zone);
+        if (hash3(line, dseed, 6.0f) < chance) {
+            float st = hash3(line, dseed, 7.0f) * W * 1.1f - 0.05f * W;
+            float r8 = hash3(line, dseed, 8.0f);
+            float ln = (15.0f + 260.0f * r8 * r8) * s;
+            float ddx = fx - st;
+            if (ddx > -3.0f * s && ddx < ln) {
+                float head = ddx < 0.0f ? 1.0f + ddx / (3.0f * s) : 1.0f;
+                float tl = 1.0f - ddx / ln; tl = ddx < 0.0f ? 1.0f : tl * tl * (0.4f + 0.6f * tl);
+                float grain = 0.7f + 0.6f * hash3(_floor(fx / (2.0f * s)), line, dseed + 2.0f);
+                float vsh = _sinf(3.14159f * fract1(fy / (2.0f * s)));
+                float k = cl01(head * tl * grain * (0.35f + 0.65f * vsh));
+                if (hash3(line, dseed, 9.0f) < 0.25f) Y *= 1.0f - 0.8f * k;
+                else Y += (1.05f - Y) * k;
+                I2 *= 1.0f - k; Q2 *= 1.0f - k;
             }
         }
     }

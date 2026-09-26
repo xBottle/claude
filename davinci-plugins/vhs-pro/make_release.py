@@ -67,6 +67,7 @@ FU="$HOME/Library/Application Support/Blackmagic Design/DaVinci Resolve/Fusion"
 mkdir -p "$FU/Templates/Edit/Effects/@CAT@" "$FU/Fuses"
 cp -f Effect/* "$FU/Templates/Edit/Effects/@CAT@/"
 cp -f Fuses/* "$FU/Fuses/"
+mkdir -p "$FU/Scripts/Comp/vhs-pro" && cp -Rf Presets/* "$FU/Scripts/Comp/vhs-pro/"
 echo "@NAME@: эффект установлен."
 echo
 echo "Готово. Полностью перезапустите DaVinci Resolve (Cmd+Q)."
@@ -81,6 +82,7 @@ mkdir "%FU%\Templates\Edit\Effects\@WCAT@" 2>nul
 mkdir "%FU%\Fuses" 2>nul
 xcopy /Y /Q "Effect\*" "%FU%\Templates\Edit\Effects\@WCAT@\" >nul
 xcopy /Y /Q "Fuses\*" "%FU%\Fuses\" >nul
+mkdir "%FU%\Scripts\Comp\vhs-pro" 2>nul & xcopy /Y /Q /E "Presets\*" "%FU%\Scripts\Comp\vhs-pro\" >nul
 echo @NAME@: эффект установлен.
 echo.
 echo Готово. Полностью перезапустите DaVinci Resolve.
@@ -94,6 +96,7 @@ FU="$HOME/.local/share/DaVinciResolve/Fusion"
 mkdir -p "$FU/Templates/Edit/Effects/@CAT@" "$FU/Fuses"
 cp -f Effect/* "$FU/Templates/Edit/Effects/@CAT@/"
 cp -f Fuses/* "$FU/Fuses/"
+mkdir -p "$FU/Scripts/Comp/vhs-pro" && cp -rf Presets/* "$FU/Scripts/Comp/vhs-pro/"
 echo "@NAME@: эффект установлен. Перезапустите DaVinci Resolve."
 '''
 
@@ -112,7 +115,9 @@ README = '''@UNAME@ — процедурный VHS-эффект для DaVinci R
   Fusion     : Shift+Пробел → «VHS Core»
 
 КАК ПОЛЬЗОВАТЬСЯ
-  • Вкладка «Управление»: пресет → «Применить пресет».
+  • Вкладка «Управление» → «ОКНО ПРЕСЕТОВ»: 13 пресетов с превью, режим магнитофона,
+    быстрые кнопки (съёмка с рук, дата, залом, 4:3), свои пресеты ★ со снимком кадра.
+  • Или в Инспекторе: пресет → «Применить пресет».
   • Плёнка / Помехи / Камера / Кадр — ручная настройка, описание внизу каждой вкладки.
   • Камера: съёмка с рук, дрожь, шаги, поиск фокуса, дата и время на экране.
   • Эффект считается на видеокарте одной нодой — работает в реальном времени.
@@ -150,7 +155,8 @@ STORE_TEXT = """VHS PRO — настоящая кассета и камкорд�
 • Полоса смены головок внизу кадра, снег, цветной шум, белые выпадения
 • Залом плёнки, режимы: пауза, перемотка назад и вперёд
 • Цвет плёнки: насыщенность, оттенок, тепло, подъём чёрного; формат 4:3
-• 13 пресетов, свои пресеты, обмен кодом настроек
+• Окно пресетов с превью: 13 пресетов, режим магнитофона в один клик,
+  свои пресеты со снимком кадра, обмен кодом настроек
 • Установщики для macOS, Windows и Linux
 
 ТРЕБОВАНИЯ
@@ -158,7 +164,9 @@ DaVinci Resolve 18 и новее (Edit, Cut, Fusion). Работает и в б�
 """
 
 
-def fill(txt, name):
+def fill(txt, name, demo=False):
+    if demo:  # в демо нет окна пресетов
+        txt = "\n".join(l for l in txt.split("\n") if "Presets" not in l and "ОКНО" not in l)
     return (txt.replace("@NAME@", name).replace("@UNAME@", name.upper())
                .replace("@CAT@", CAT).replace("@WCAT@", CAT.replace("/", "\\")))
 
@@ -185,6 +193,16 @@ def build_edition(name, demo):
     with open(os.path.join(P, "Effect", name + ".setting"), "w", encoding="utf-8") as f:
         f.write(m.build_setting(0, fuse_id))
     make_icon(os.path.join(P, "Effect", name + ".png"), demo)
+    if not demo:  # окно пресетов: скрипт + данные + превью
+        os.makedirs(os.path.join(P, "Presets", "icons"), exist_ok=True)
+        with open(os.path.join(HERE, "VHS Presets.lua"), encoding="utf-8") as f:
+            win = strip_lua_comments(f.read())
+        with open(os.path.join(P, "Presets", "VHS Presets.lua"), "w", encoding="utf-8") as f:
+            f.write(win)
+        shutil.copy2(os.path.join(HERE, "vhs_pro_data.lua"), os.path.join(P, "Presets"))
+        for fn in os.listdir(os.path.join(HERE, "icons")):
+            if fn.endswith(".png"):
+                shutil.copy2(os.path.join(HERE, "icons", fn), os.path.join(P, "Presets", "icons"))
     fuse = strip_lua_comments(m.build_fuse())
     if demo:  # своя нода и своё ядро: полная версия не перезапишет демо
         fuse = (fuse.replace('FuRegisterClass("VHSCore"', 'FuRegisterClass("VHSCoreDemo"')
@@ -194,10 +212,10 @@ def build_edition(name, demo):
         assert "VHSCoreDemo" in fuse and "void VHSKernelDemo(" in fuse
     with open(os.path.join(P, "Fuses", fuse_id + ".fuse"), "w", encoding="utf-8") as f:
         f.write(fuse)
-    files = {"Установить (macOS).command": fill(MAC, name),
-             "Установить (Windows).bat": fill(WIN, name).replace("\n", "\r\n"),
-             "install-linux.sh": fill(LINUX, name),
-             "README.txt": fill(README, name) + (DEMO_NOTE if demo else ""),
+    files = {"Установить (macOS).command": fill(MAC, name, demo),
+             "Установить (Windows).bat": fill(WIN, name, demo).replace("\n", "\r\n"),
+             "install-linux.sh": fill(LINUX, name, demo),
+             "README.txt": fill(README, name, demo) + (DEMO_NOTE if demo else ""),
              "LICENSE.txt": fill(LICENSE, name)}
     for fn, txt in files.items():
         with open(os.path.join(out, fn), "w", encoding="utf-8", newline="") as f:
