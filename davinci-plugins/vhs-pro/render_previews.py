@@ -3,7 +3,7 @@
 запущенное на CPU по тестовой сцене. Результат: icons/preset_N.png (320x180).
 Запуск: python3 render_previews.py
 """
-import math, os, re, subprocess, tempfile, importlib.util
+import math, os, re, sys, subprocess, tempfile, importlib.util
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
@@ -157,25 +157,9 @@ def render(exe, tmp, preset, t):
 
 
 def make_title(path):
-    """Шапка окна пресетов 330x64 — в стиле CRT Pro."""
-    W2, H2 = 330, 64
-    im = Image.new("RGB", (W2, H2), (14, 15, 20))
-    mask = Image.new("L", (W2, H2), 0)
-    ImageDraw.Draw(mask).text((8, 2), "VHS PRO", font=ImageFont.truetype(
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 36), fill=255)
-    grad = Image.new("RGB", (W2, H2))
-    for x in range(W2):
-        t = min(1, x / 190)
-        c = (int(255 * (1 - t) + 34 * t), int(90 * (1 - t) + 211 * t), int(170 * (1 - t) + 238 * t))
-        grad.paste(c, (x, 0, x + 1, H2))
-    im.paste(grad, (0, 0), mask)
-    d = ImageDraw.Draw(im)
-    d.rounded_rectangle([232, 12, 322, 36], radius=12, fill=(29, 26, 51), outline=(139, 123, 255), width=1)
-    d.text((277, 24), "PRESETS", font=ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 11),
-           fill=(230, 231, 238), anchor="mm")
-    d.text((10, 50), "GPU · tape · camcorder", font=ImageFont.truetype(
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 11), fill=(90, 92, 104))
-    im.save(path)
+    sys.path.insert(0, os.path.dirname(HERE))
+    import storyverse_style as SV
+    SV.window_title("VHS PRO", "GPU · tape · camcorder").save(path)
 
 
 def main():

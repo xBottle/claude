@@ -9,6 +9,9 @@ import os
 import re
 import shutil
 import zipfile
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import storyverse_style as SV  # единый стиль STORYVERSE (см. ../STYLE.md)
 import importlib.util
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -212,28 +215,9 @@ DaVinci Resolve 18 и новее (проверено на 20). Страница 
 
 
 def make_cover():
-    """Сдержанная обложка 1920x1080 (как у VHS Pro): кадр эффекта, затемнение снизу, заголовок слева."""
-    from PIL import Image, ImageDraw, ImageFont
-    W, H = 1920, 1080
-    bold = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-    reg = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
-    from PIL import ImageEnhance
-    cover = Image.open(os.path.join(HERE, "store_assets", "cover_bg.png")).convert("RGB").resize((W, H), Image.LANCZOS)
-    cover = ImageEnhance.Brightness(cover).enhance(1.9)
-    shade = Image.new("L", (W, H))
-    sp = shade.load()
-    for y in range(H):
-        v = int(235 * max(0.0, (y / H - 0.35) / 0.65) ** 1.4)
-        for x in range(W):
-            sp[x, y] = int(v * (1 - 0.35 * x / W))
-    cover = Image.composite(Image.new("RGB", (W, H), (8, 8, 12)), cover, shade)
-    d = ImageDraw.Draw(cover)
-    d.text((W - 110, 96), "S T O R Y V E R S E", font=ImageFont.truetype(reg, 26), fill=(200, 202, 210), anchor="ra")
-    d.text((104, 770), "CRT PRO", font=ImageFont.truetype(bold, 150), fill=(245, 245, 248), anchor="ls")
-    d.text((110, 840), "Настоящий кинескоп для DaVinci Resolve", font=ImageFont.truetype(reg, 40),
-           fill=(205, 207, 215), anchor="ls")
-    d.line([(110, 880), (230, 880)], fill=(255, 255, 255), width=3)
-    return cover
+    from PIL import Image
+    return SV.cover(Image.open(os.path.join(HERE, "store_assets", "cover_bg.png")), "CRT PRO",
+                    "Настоящий кинескоп для DaVinci Resolve")
 
 
 def make_store(m):
@@ -242,15 +226,9 @@ def make_store(m):
     st = os.path.join(DIST, "Для магазина")
     os.makedirs(st, exist_ok=True)
     icons = os.path.join(HERE, "icons")
-    n = len(m.PRESET_NAMES)
-    cols, w, h = 3, 320, 180
-    rows = (n + cols - 1) // cols
-    sheet = Image.new("RGB", (cols * w + (cols + 1) * 12, rows * (h + 34) + 12), (14, 15, 20))
-    d = ImageDraw.Draw(sheet)
-    for i, name in enumerate(m.PRESET_NAMES):
-        x, y = 12 + (i % cols) * (w + 12), 12 + (i // cols) * (h + 34)
-        sheet.paste(Image.open(os.path.join(icons, f"preset_{i}.png")).resize((w, h)), (x, y))
-        d.text((x + 4, y + h + 8), name, fill=(214, 216, 226))
+    from PIL import Image
+    sheet = SV.preset_sheet([Image.open(os.path.join(icons, f"preset_{i}.png")) for i in range(len(m.PRESET_NAMES))],
+                            m.PRESET_NAMES)
     sheet.save(os.path.join(st, "Пресеты.png"))
     pat = Image.new("RGB", (5 * 172 + 12, 2 * 102 + 12), (14, 15, 20))
     for i in range(10):
@@ -265,11 +243,11 @@ def make_store(m):
 
 DEMO_NOTE = """
 ДЕМО-ВЕРСИЯ
-  Это демо «просто попробовать»: водяной знак CRT PRO DEMO, 3 пресета
+  Это демо «просто попробовать»: надпись STORYVERSE-CORE-CRT-PRO.DEMO внизу кадра, 3 пресета
   и 3 настройки — размер пикселя, яркость, гамма.
   Полная версия: 18 пресетов, окно пресетов, 10 узоров пикселей, 18 модулей
   (свечение, строки, выпуклость, послесвечение, помехи…), DCTL для Color,
-  без водяного знака.
+  без надписи.
 """
 
 
@@ -291,7 +269,9 @@ def build_edition(name, demo):
     with open(os.path.join(P, "Effect", name + ".setting"), "w", encoding="utf-8") as f:
         st = publicize(m.build_setting(0), name)
         f.write(add_demo_mark(st.replace("Fuse.CRTCore", "Fuse.CRTCoreDemo")) if demo else st)
-    shutil.copy2(os.path.join(HERE, "effect", SRC + ".png"), os.path.join(P, "Effect", name + ".png"))
+    from PIL import Image
+    SV.library_icon(Image.open(os.path.join(HERE, "store_assets", "cover_bg.png")), "CRT", demo).save(
+        os.path.join(P, "Effect", name + ".png"))
     fuse = publicize(strip_lua_comments(m.build_fuse()), "CRT Pro").replace('REGS_Category = "Claude"', 'REGS_Category = "STORYVERSE\\\\CRT"')
     if demo:
         assert "DEMO_BUILD = false" in fuse

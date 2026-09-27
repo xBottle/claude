@@ -252,7 +252,7 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height:0; }]] },
             },
             ui:Button{ ID = "BtnThumb", Text = "Снять превью с текущего кадра (для своего ★)", StyleSheet = btnStyle(WHITE), Weight = 0 },
             ui:Label{ ID = "Status", Text = statusText, Weight = 0, WordWrap = true, StyleSheet = "color:#9d8cff;" },
-            ui:Label{ Text = DEMO and "CRT PRO  ·  DEMO  ·  полная версия без водяного знака" or "CRT PRO  ·  GPU procedural core", Weight = 0, Alignment = { AlignHCenter = true },
+            ui:Label{ Text = DEMO and "CRT PRO  ·  DEMO  ·  by STORYVERSE" or "CRT PRO  ·  by STORYVERSE", Weight = 0, Alignment = { AlignHCenter = true },
                 StyleSheet = "color:#4a4c58; font-size:10px; letter-spacing:1px;" },
         },
     })

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Превью пресетов CRT Pro на реальном ядре: CRTCore (из build_fuse) компилируется gcc и
 запускается на CPU. Цепочка как в эффекте: проход 0 → свечение → ореол трубки → проход 1.
-Сцена: store_assets/scene_eye.png (кадр заказчика). Результат: icons/preset_N.png,
+Сцена: store_assets/scene.png (кадр заказчика; scene_eye.png — глаз, на потом). Результат: icons/preset_N.png,
 store_assets/cover_bg.png, effect/CRT Pro v2.png.
 Запуск: python3 render_previews.py
 """
@@ -85,7 +85,7 @@ def blur(a, r):
 
 
 def scene():
-    im = Image.open(os.path.join(HERE, "store_assets", "scene_eye.png")).convert("RGB").resize((W, H), Image.LANCZOS)
+    im = Image.open(os.path.join(HERE, "store_assets", "scene.png")).convert("RGB").resize((W, H), Image.LANCZOS)
     a = np.asarray(im.transpose(Image.FLIP_TOP_BOTTOM), dtype=np.float32) / 255
     return np.concatenate([a, np.ones((H, W, 1), np.float32)], 2)
 

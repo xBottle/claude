@@ -254,7 +254,7 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height:0; }]] },
             },
             ui:Button{ ID = "BtnThumb", Text = "Снять превью с текущего кадра (для своего ★)", StyleSheet = btnStyle(WHITE), Weight = 0 },
             ui:Label{ ID = "Status", Text = statusText, Weight = 0, WordWrap = true, StyleSheet = "color:#9d8cff;" },
-            ui:Label{ Text = DEMO and "VHS PRO  ·  DEMO  ·  полная версия без надписи" or "VHS PRO  ·  GPU procedural tape", Weight = 0, Alignment = { AlignHCenter = true },
+            ui:Label{ Text = DEMO and "VHS PRO  ·  DEMO  ·  by STORYVERSE" or "VHS PRO  ·  by STORYVERSE", Weight = 0, Alignment = { AlignHCenter = true },
                 StyleSheet = "color:#4a4c58; font-size:10px; letter-spacing:1px;" },
         },
     })

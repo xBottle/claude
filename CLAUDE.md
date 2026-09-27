@@ -13,7 +13,7 @@
 | `CRT Presets.lua` | окно пресетов (UIManager): плитка пресетов на ui:Tree (3 колонки, своя прокрутка), узоры, свои пресеты с превью (`ExportCurrentFrameAsStill`), синхронизация списка в шаблоне |
 | `crt_pro_data.lua` | данные для окна: `python3 gen_data.py build_crt_pro_2.py` после правок генератора |
 | `CRT Pro v2.dctl` | упрощённая версия для страницы Color (ASCII-подписи, без времени/размытия) |
-| `icons/` | превью пресетов — `python3 render_previews.py` (ядро через gcc на CPU, сцена `store_assets/scene_eye.png` — фото заказчика); также пишет cover_bg.png и иконку эффекта. Узоры pattern_*.png — старые |
+| `icons/` | превью пресетов — `python3 render_previews.py` (ядро через gcc на CPU, сцена `store_assets/scene.png` — временное фото (огонь)); также пишет cover_bg.png и иконку эффекта. Узоры pattern_*.png — старые |
 | `make_release.py` | чистый пакет: payload + установщики macOS/Windows/Linux + README/LICENSE; `dist/Для магазина/` (обложка из `store_assets/`, сетка пресетов, описание) |
 | публичные пути | `Effects/STORYVERSE/CRT/`, `Scripts/Comp/crt-pro/`, `LUT/STORYVERSE/` (make_release.py подменяет пути исходников v2) |
 | `validate_crt_pro.lua` | валидатор (запускается через fuscript на Mac при `--install`) |
@@ -30,8 +30,10 @@
 Окно пресетов `VHS Presets.lua` (копия окна CRT: вместо узоров — кнопки режима магнитофона и быстрые тумблеры), данные `vhs_pro_data.lua` пишет build_vhs_pro.py.
 Пути: `Effects/STORYVERSE/VHS/`, Fuses/VHSCore.fuse, `Scripts/Comp/vhs-pro/`. В демо окна нет.
 
-## Отложенные правки (заказчик просил запомнить)
-- В окна пресетов (CRT и VHS) добавить брендинг STORYVERSE (напр. «by STORYVERSE» в шапке/подвале) — сделать вместе, когда вернёмся к CRT.
+## Единый стиль — `davinci-plugins/STYLE.md` + `storyverse_style.py`
+Обложки, иконки библиотеки, листы пресетов, шапки окон — только через storyverse_style.py.
+⚠ Фото в store_assets/scene.png у CRT (огонь) и VHS (клип) — ВРЕМЕННЫЕ, заказчик пришлёт финальные; таблица замены в STYLE.md.
+Свои пресеты заказчика хранятся только у него (Fusion/<КОД> Pro User Presets), в архивы не попадают (SHARE_MODE).
 
 ## Архив
 - `crt-pro-v1/` — стабильная CRT Pro 1.0, НЕ МЕНЯТЬ.
