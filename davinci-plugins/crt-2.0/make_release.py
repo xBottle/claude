@@ -305,10 +305,11 @@ def build_edition(name, demo):
 
     readme = fill(README, name, demo) + (DEMO_NOTE if demo else "")
     spec = {"name": name, "code": "CRT", "scripts": None if demo else "crt-pro",
-            "dctl": not demo, "demo": demo}
+            "tagline": 'Процедурный CRT-эффект (кинескоп) для DaVinci Resolve 18+', "usage": ['Вкладка «Управление» → «ОКНО ПРЕСЕТОВ»: 18 пресетов с превью, 10 узоров пикселей, свои пресеты ★ со снимком кадра.', 'Или в Инспекторе: пресет → «Применить пресет».', 'Вкладки Пиксели / Экран / Цвет / Помехи — ручная настройка, описание внизу каждой вкладки.', 'Эффект считается на видеокарте — работает в реальном времени.', 'Не ставьте эффект одновременно на Edit и на Color — двойная сетка даёт муар.'],
+            "demo_note": ['Надпись STORYVERSE-CORE-CRT-PRO.DEMO внизу кадра, 3 пресета и 3 настройки:', 'размер пикселя, яркость, гамма. Полная версия: 18 пресетов, окно пресетов,', '10 узоров пикселей, все модули, DCTL для Color — без надписи.'], "dctl": not demo, "demo": demo}
     files = {"Установить (macOS).command": SI.mac(spec), "Установить (Windows).bat": SI.win(spec),
              "install-linux.sh": SI.linux(spec), "Инструкция по установке.html": SI.guide_html(spec),
-             "README.txt": readme, "LICENSE.txt": fill(LICENSE, name, demo)}
+             "README.txt": SI.readme(spec), "LICENSE.txt": SI.license_text(spec)}
     for fn, txt in files.items():
         with open(os.path.join(out, fn), "w", encoding="utf-8", newline="") as f:
             f.write(txt)

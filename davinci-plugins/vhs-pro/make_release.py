@@ -215,10 +215,11 @@ def build_edition(name, demo):
     with open(os.path.join(P, "Fuses", fuse_id + ".fuse"), "w", encoding="utf-8") as f:
         f.write(fuse)
     spec = {"name": name, "code": "VHS", "scripts": None if demo else "vhs-pro",
-            "dctl": False, "demo": demo}
+            "tagline": 'Процедурный VHS и камкордер для DaVinci Resolve 18+', "usage": ['Вкладка «Управление» → «ОКНО ПРЕСЕТОВ»: 13 пресетов с превью, режим магнитофона, быстрые кнопки, свои пресеты ★.', 'Или в Инспекторе: пресет → «Применить пресет».', 'Плёнка / Помехи / Камера / Кадр — ручная настройка, описание внизу каждой вкладки.', 'Камера: съёмка с рук, дрожь, шаги, поиск фокуса, дата и время на экране.', 'Эффект считается на видеокарте одной нодой — работает в реальном времени.'],
+            "demo_note": ['Надпись STORYVERSE-CORE-VHS-PRO.DEMO внизу кадра, 3 пресета и 3 настройки:', 'сдвиг цвета, снег, дрожание строк. Полная версия: 13 пресетов, 59 настроек —', 'съёмка с рук, надписи камеры, пауза и перемотка, залом, свои пресеты — без надписи.'], "dctl": False, "demo": demo}
     files = {"Установить (macOS).command": SI.mac(spec), "Установить (Windows).bat": SI.win(spec),
              "install-linux.sh": SI.linux(spec), "Инструкция по установке.html": SI.guide_html(spec),
-             "README.txt": fill(README, name, demo) + (DEMO_NOTE if demo else ""), "LICENSE.txt": fill(LICENSE, name)}
+             "README.txt": SI.readme(spec), "LICENSE.txt": SI.license_text(spec)}
     for fn, txt in files.items():
         with open(os.path.join(out, fn), "w", encoding="utf-8", newline="") as f:
             f.write(txt)

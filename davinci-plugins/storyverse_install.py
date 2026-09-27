@@ -32,7 +32,8 @@ def mac(s):
          f'echo "  {s["name"].upper()}  ·  by STORYVERSE"', 'echo "  ------------------------------------"',
          f'echo "  Установка эффекта в DaVinci Resolve."', 'echo',
          'if pgrep -xq "Resolve"; then echo "  ! DaVinci Resolve открыт — после установки его нужно будет перезапустить."; echo; fi',
-         'read -r -p "  Нажмите Enter, чтобы установить (или закройте окно, чтобы отменить)... " _',
+         'echo "  Устанавливая, вы соглашаетесь с условиями лицензии (LICENSE.txt рядом с установщиком)."', 'echo',
+         'read -r -p "  Нажмите Enter, чтобы согласиться и установить (или закройте окно, чтобы отменить)... " _',
          'cd "$(dirname "$0")/payload" || { echo "  Не найдена папка payload рядом с установщиком."; read -r _; exit 1; }',
          f'FU="{FU_MAC}"']
     for src, dst, label in _items(s):
@@ -56,7 +57,8 @@ def win(s):
          f"echo   {s['name'].upper()}  ·  by STORYVERSE", "echo   ------------------------------------",
          "echo   Установка эффекта в DaVinci Resolve.", "echo.",
          'tasklist /FI "IMAGENAME eq Resolve.exe" 2>nul | find /I "Resolve.exe" >nul && echo   ! DaVinci Resolve открыт — после установки его нужно будет перезапустить.',
-         "set /p _=  Нажмите Enter, чтобы установить (или закройте окно, чтобы отменить)... ",
+         "echo   Устанавливая, вы соглашаетесь с условиями лицензии (LICENSE.txt рядом с установщиком).", "echo.",
+         "set /p _=  Нажмите Enter, чтобы согласиться и установить (или закройте окно, чтобы отменить)... ",
          'cd /d "%~dp0payload" || (echo   Не найдена папка payload. & pause & exit /b 1)',
          'set "FU=%APPDATA%\\Blackmagic Design\\DaVinci Resolve\\Support\\Fusion"']
     for src, dst, label in _items(s):
@@ -78,7 +80,8 @@ def win(s):
 def linux(s):
     L = ["#!/bin/bash", f"# {s['name']} — установка для Linux: bash install-linux.sh",
          f'echo "{s["name"].upper()} · by STORYVERSE"',
-         'read -r -p "Нажмите Enter, чтобы установить... " _',
+         'echo "Устанавливая, вы соглашаетесь с условиями лицензии (LICENSE.txt)."',
+         'read -r -p "Нажмите Enter, чтобы согласиться и установить... " _',
          'cd "$(dirname "$0")/payload" || exit 1', f'FU="{FU_LIN}"']
     for src, dst, label in _items(s):
         L += [f'mkdir -p "$FU/{dst}" && cp -rf {src}/. "$FU/{dst}/" && echo "✓ {label}"']
@@ -93,7 +96,7 @@ def linux(s):
 
 CONTACT = "__CONTACT__"   # почта/контакт поддержки — подставить, когда заказчик пришлёт
 YEAR = "2026"
-RED = "#B3302B"            # фирменный красный STORYVERSE (приглушённый)
+RED = "#C9352B"            # фирменный красный STORYVERSE (насыщенный, не яркий)
 
 ICON = {  # простые монохромные значки систем (SVG, цвет = currentColor)
     "macOS": '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M16.4 12.6c0-2.5 2-3.7 2.1-3.8-1.2-1.7-3-1.9-3.6-2-1.5-.2-3 .9-3.8.9-.8 0-2-.9-3.3-.9-1.7 0-3.3 1-4.1 2.5-1.8 3.1-.5 7.6 1.3 10.1.8 1.2 1.8 2.6 3.1 2.5 1.3-.1 1.7-.8 3.2-.8s1.9.8 3.2.8c1.3 0 2.2-1.2 3-2.4.9-1.4 1.3-2.7 1.3-2.8-.1 0-2.4-.9-2.4-4.1zM14 5.2c.7-.8 1.1-2 1-3.2-1 .1-2.2.7-2.9 1.5-.6.7-1.2 1.9-1 3.1 1.1.1 2.2-.6 2.9-1.4z"/></svg>',
@@ -102,22 +105,22 @@ ICON = {  # простые монохромные значки систем (SVG
 }
 
 GUIDE_CSS = """
-:root{color-scheme:dark;--red:#B3302B;--bg:#141416;--card:#1c1c1f;--line:#2c2c30}*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:#e8e8ea;font:16px/1.6 -apple-system,Segoe UI,Roboto,sans-serif}
+:root{color-scheme:dark;--red:#C9352B;--bg:#1b1b1a;--card:#252524;--line:#363634}*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:#ebebe8;font:16px/1.6 -apple-system,Segoe UI,Roboto,sans-serif}
 main{max-width:760px;margin:0 auto;padding:48px 20px 40px}
 .brand{letter-spacing:.35em;color:var(--red);font-size:12px;font-weight:600}
 h1{font-size:40px;margin:6px 0 4px}h2{margin:40px 0 10px;font-size:22px;padding-left:12px;border-left:3px solid var(--red)}
-.sub{color:#a6a6ad;margin:0 0 24px}
+.sub{color:#a8a8a3;margin:0 0 24px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 22px;margin:14px 0}
 ol{padding-left:22px}li{margin:6px 0}li::marker{color:var(--red);font-weight:600}
-code{background:#26262a;padding:2px 6px;border-radius:6px;color:#f0c9c6}
+code{background:#30302e;padding:2px 6px;border-radius:6px;color:#f2cfc9}
 .os{display:inline-flex;align-items:center;gap:8px;color:#fff;font-weight:600;font-size:15px;margin-bottom:4px}
 .os svg{color:var(--red)}
-.warn{border-color:#5c2a27;background:#221716}
-dt{font-weight:600;margin-top:14px}dd{margin:4px 0 0 0;color:#c8c8ce}
-.path{font-family:ui-monospace,Menlo,monospace;font-size:13px;color:#e07a73;word-break:break-all}
-a{color:#e07a73}
-footer{max-width:760px;margin:0 auto;padding:22px 20px 48px;border-top:1px solid var(--line);color:#8e8e96;font-size:13px}
+.warn{border-color:#6a2c26;background:#2a1d1b}
+dt{font-weight:600;margin-top:14px}dd{margin:4px 0 0 0;color:#cacac5}
+.path{font-family:ui-monospace,Menlo,monospace;font-size:13px;color:#e8776c;word-break:break-all}
+a{color:#e8776c}
+footer{max-width:760px;margin:0 auto;padding:22px 20px 48px;border-top:1px solid var(--line);color:#8f8f8a;font-size:13px}
 footer b{color:#e8e8ea}
 """
 
@@ -144,6 +147,8 @@ def guide_html(s):
 <div class="brand">S T O R Y V E R S E</div>
 <h1>{n}</h1><p class="sub">Инструкция по установке в DaVinci Resolve 18+ · около 1 минуты</p>
 {demo}
+<div class="card"><b>Лицензия.</b> Устанавливая и используя {n}, вы соглашаетесь с условиями лицензионного соглашения —
+файл <code>LICENSE.txt</code> в архиве.</div>
 <h2>Установка</h2>
 <div class="card"><span class="os">{ICON["macOS"]}macOS</span><ol>
 <li>Распакуйте архив (двойной клик по .zip).</li>
@@ -162,7 +167,7 @@ def guide_html(s):
 <h2>Где найти</h2>
 <div class="card"><ol>
 <li>Страница <b>Edit</b> или <b>Cut</b> → Effects → <b>STORYVERSE → {code}</b> → перетащите «{n}» на клип.</li>
-<li>Fusion: <code>Shift+Пробел</code> → «{code} Core».</li>
+<li>Fusion: <code>Shift+Пробел</code> → «{code} Core{" Demo" if s.get("demo") else ""}».</li>
 {window}
 {color}
 </ol></div>
@@ -182,6 +187,78 @@ def guide_html(s):
 <dt>Ничего не помогло</dt><dd>Напишите нам: <a href="mailto:{CONTACT}">{CONTACT}</a> — приложите скриншот и версию Resolve и системы.</dd>
 </dl></div>
 </main>
-<footer><b>© {YEAR} STORYVERSE.</b> Все права защищены.<br>
-Поддержка: <a href="mailto:{CONTACT}">{CONTACT}</a></footer></body></html>
+<footer><b>© {YEAR} STORYVERSE.</b> Все права защищены. · Поддержка: <a href="mailto:{CONTACT}">{CONTACT}</a></footer></body></html>
+"""
+
+
+def readme(s):
+    """README.txt — единый формат для всех наборов. Поля spec: tagline, usage[], demo_note[]."""
+    n, code = s["name"], s["code"]
+    L = [f"{n.upper()}  ·  by STORYVERSE", s["tagline"], "=" * 64, "",
+         "УСТАНОВКА  (подробно, с решением проблем — «Инструкция по установке.html»)",
+         "  macOS   — Терминал → напечатайте «bash » (с пробелом) → перетащите в окно",
+         "            «Установить (macOS).command» → Enter → Enter. Пароль не нужен.",
+         "            (двойной клик macOS может заблокировать — файл не подписан Apple)",
+         "  Windows — распакуйте архив → «Установить (Windows).bat» → Enter.",
+         "  Linux   — bash install-linux.sh → Enter.",
+         "  После установки полностью перезапустите DaVinci Resolve.", "",
+         "ГДЕ НАЙТИ",
+         f"  Edit / Cut : Effects → STORYVERSE → {code} → «{n}»",
+         f"  Fusion     : Shift+Пробел → «{code} Core{' Demo' if s.get('demo') else ''}»"]
+    if s.get("dctl"):
+        L.append(f"  Color      : нода → Effects → DCTL → в списке DCTL «STORYVERSE → {n}» (Resolve Studio)")
+    usage = (["Вкладка «Управление»: выберите пресет → «Применить пресет», ниже — три настройки."]
+             if s.get("demo") else s["usage"])
+    L += ["", "КАК ПОЛЬЗОВАТЬСЯ"] + [f"  • {u}" for u in usage]
+    if s.get("demo"):
+        L += ["", "ДЕМО-ВЕРСИЯ"] + [f"  {d}" for d in s["demo_note"]]
+    L += ["", "ЛИЦЕНЗИЯ",
+          "  Устанавливая и используя эффект, вы соглашаетесь с условиями LICENSE.txt.", "",
+          f"© {YEAR} STORYVERSE. Все права защищены. · Поддержка: {CONTACT}", ""]
+    return "\n".join(L)
+
+
+def license_text(s):
+    """LICENSE.txt — единое лицензионное соглашение (EULA) для всех наборов."""
+    n = s["name"]
+    demo = s.get("demo")
+    return f"""ЛИЦЕНЗИОННОЕ СОГЛАШЕНИЕ — {n.upper()}
+Правообладатель: STORYVERSE. © {YEAR} STORYVERSE. Все права защищены.
+
+Устанавливая, копируя или используя {n} (далее — «Продукт»), вы подтверждаете,
+что прочитали это соглашение и принимаете его условия. Если вы не согласны —
+не устанавливайте и не используйте Продукт.
+
+1. ЛИЦЕНЗИЯ
+   {"Демо-версия предоставляется бесплатно только для ознакомления с Продуктом." if demo else
+    "Вам предоставляется простая (неисключительная), непередаваемая лицензия для одного"}
+   {"Использование результатов демо-версии в коммерческих проектах не допускается." if demo else
+    "пользователя на установку Продукта на его компьютеры и использование в личных"}
+   {"" if demo else "и коммерческих проектах (видео, клипы, реклама, соцсети) без ограничения тиража."}
+
+2. ЗАПРЕЩЕНО
+   • продавать, сдавать в аренду, публиковать, раздавать или иным образом передавать
+     файлы Продукта (в том числе пресеты, ядро, скрипты) третьим лицам — целиком
+     или частями, в исходном или изменённом виде;
+   • выдавать Продукт или его части за свою разработку, включать их в другие
+     продаваемые продукты, шаблоны и наборы;
+   • удалять или изменять упоминания правообладателя{", обходить ограничения и надпись демо-версии" if demo else ""}.
+
+3. РЕЗУЛЬТАТЫ
+   Видео и изображения, созданные с помощью {"полной версии " if demo else ""}Продукта, принадлежат вам.
+
+4. БЕЗ ГАРАНТИЙ
+   Продукт предоставляется «как есть». Правообладатель не гарантирует работу
+   с любыми версиями DaVinci Resolve, оборудованием и системами и не отвечает
+   за прямые или косвенные убытки, потерю данных или сроков, связанные
+   с использованием Продукта, в пределах, допускаемых законом.
+
+5. ПРЕКРАЩЕНИЕ
+   При нарушении условий лицензия прекращается автоматически; вы обязаны
+   удалить все копии Продукта.
+
+6. ПРОЧЕЕ
+   DaVinci Resolve — товарный знак Blackmagic Design Pty. Ltd.; Продукт не является
+   продуктом Blackmagic Design и не одобрен ею.
+   Вопросы и поддержка: {CONTACT}
 """
