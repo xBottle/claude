@@ -52,6 +52,7 @@ SECTIONS = [
     ("SecGlobal", "Общее", True, [
         slider("GlobalMix", "Сила эффекта", 1, 0, 1, 0, 1),
         check("ScaleRes", "Масштабировать с разрешением", 1),
+        check("PerfOn", "Замер скорости (в консоль)", 0),
     ]),
     ("SecTape", "Качество кассеты", True, [
         slider("LumaBlur", "Размытие яркости", 2.5, 0, 10, 0, 40),

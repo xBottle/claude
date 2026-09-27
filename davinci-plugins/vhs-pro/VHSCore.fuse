@@ -25,6 +25,7 @@ VHSParams = [[
     float w; float h; float s; float seed; float sec;
     float GlobalMix;
     float ScaleRes;
+    float PerfOn;
     float LumaBlur;
     float ChromaBlur;
     float ChromaShift;
@@ -373,6 +374,7 @@ function Create()
     INP = {}
     INP["GlobalMix"] = self:AddInput("GlobalMix", "GlobalMix", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 1 })
     INP["ScaleRes"] = self:AddInput("ScaleRes", "ScaleRes", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 1 })
+    INP["PerfOn"] = self:AddInput("PerfOn", "PerfOn", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 0 })
     INP["LumaBlur"] = self:AddInput("LumaBlur", "LumaBlur", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 2.5 })
     INP["ChromaBlur"] = self:AddInput("ChromaBlur", "ChromaBlur", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 9 })
     INP["ChromaShift"] = self:AddInput("ChromaShift", "ChromaShift", { LINKID_DataType = "Number", INPID_InputControl = "SliderControl", INP_Default = 3 })
@@ -568,7 +570,12 @@ function Process(req)
     node:AddInput("src", src)
     node:AddInput("org", org)
     node:AddOutput("dst", dst)
+    local t0 = os.clock()
     local ok = node:RunSession(req)
+    if V.PerfOn > 0.5 then
+        local ms = (os.clock() - t0) * 1000
+        print(string.format("[VHS Core] %.2f мс на кадр (%dx%d) ≈ %.0f fps", ms, W, H, ms > 0 and 1000 / ms or 0))
+    end
     if not ok then
         dump(node:GetErrorLog())
         OutImage:Set(req, src)

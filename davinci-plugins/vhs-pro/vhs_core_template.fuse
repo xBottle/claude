@@ -358,7 +358,12 @@ __READ_INPUTS__
     node:AddInput("src", src)
     node:AddInput("org", org)
     node:AddOutput("dst", dst)
+    local t0 = os.clock()
     local ok = node:RunSession(req)
+    if V.PerfOn > 0.5 then
+        local ms = (os.clock() - t0) * 1000
+        print(string.format("[VHS Core] %.2f мс на кадр (%dx%d) ≈ %.0f fps", ms, W, H, ms > 0 and 1000 / ms or 0))
+    end
     if not ok then
         dump(node:GetErrorLog())
         OutImage:Set(req, src)

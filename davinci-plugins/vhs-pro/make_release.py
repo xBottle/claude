@@ -122,6 +122,10 @@ README = '''@UNAME@ — процедурный VHS-эффект для DaVinci R
   • Камера: съёмка с рук, дрожь, шаги, поиск фокуса, дата и время на экране.
   • Эффект считается на видеокарте одной нодой — работает в реальном времени.
 
+ЕСЛИ НЕ ВИДНО КНОПКИ «ОКНО ПРЕСЕТОВ» ИЛИ ЭФФЕКТА
+  • Полностью закройте Resolve (Cmd+Q / Alt+F4) и откройте снова.
+  • Удалите эффект с клипа и перетащите заново — старые копии на клипах не обновляются.
+
 © STORYVERSE. Лицензия — см. LICENSE.txt
 '''
 
@@ -259,6 +263,7 @@ def make_store(m):
     d.text((W // 2, H // 2 + 110), "tape  ·  camcorder  ·  DaVinci Resolve", font=ImageFont.truetype(FONT_R, 46),
            fill=(230, 231, 238), anchor="mm")
     cover.save(os.path.join(st, "Обложка.png"))
+    shutil.copy2(os.path.join(HERE, "store_assets", "Страница товара.md"), os.path.join(st, "Страница товара.md"))
     with open(os.path.join(st, "Описание товара.txt"), "w", encoding="utf-8") as f:
         f.write(STORE_TEXT)
 
