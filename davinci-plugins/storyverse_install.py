@@ -132,6 +132,10 @@ def guide_html(s):
                 "Нажмите <code>y</code> и введите пароль от Mac (символы при вводе не видны — это нормально), "
                 "или просто <code>Enter</code>, чтобы пропустить.</li>") if s.get("dctl") else ""
     window = (f"<li>Вкладка «Управление» → кнопка <b>«▣ ОКНО ПРЕСЕТОВ»</b>.</li>") if s.get("scripts") else ""
+    color = ("<li>Страница <b>Color</b> (только Resolve Studio, если при установке выбрали DCTL): выберите ноду → "
+             "Effects → <b>DCTL</b> (группа ResolveFX) → перетащите на ноду → в его настройках, в списке DCTL, "
+             f"выберите <b>STORYVERSE → {n}</b>. Не ставьте эффект одновременно на Edit и на Color — появится муар.</li>"
+             ) if s.get("dctl") else ""
     demo = ("<div class='card warn'><b>Это демо-версия.</b> Внизу кадра надпись, часть пресетов и настроек недоступна. "
             "Полная версия ставится так же и не конфликтует с демо.</div>") if s.get("demo") else ""
     return f"""<!doctype html><html lang="ru"><head><meta charset="utf-8">
@@ -160,6 +164,7 @@ def guide_html(s):
 <li>Страница <b>Edit</b> или <b>Cut</b> → Effects → <b>STORYVERSE → {code}</b> → перетащите «{n}» на клип.</li>
 <li>Fusion: <code>Shift+Пробел</code> → «{code} Core».</li>
 {window}
+{color}
 </ol></div>
 
 <h2>Если что-то не так</h2>
