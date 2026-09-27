@@ -33,6 +33,7 @@
 ## Единый стиль — `davinci-plugins/STYLE.md` + `storyverse_style.py`
 Обложки, иконки библиотеки, листы пресетов, шапки окон — только через storyverse_style.py.
 ⚠ Фото в store_assets/scene.png у CRT (огонь) и VHS (клип) — ВРЕМЕННЫЕ, заказчик пришлёт финальные; таблица замены в STYLE.md.
+Установщики и «Инструкция по установке.html» — только через storyverse_install.py (без пароля; DCTL по вопросу).
 Свои пресеты заказчика хранятся только у него (Fusion/<КОД> Pro User Presets), в архивы не попадают (SHARE_MODE).
 
 ## Архив

@@ -12,6 +12,7 @@ import zipfile
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import storyverse_style as SV  # единый стиль STORYVERSE (см. ../STYLE.md)
+import storyverse_install as SI  # единые установщики и инструкция
 import importlib.util
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -157,13 +158,12 @@ echo "Готово. Перезапустите DaVinci Resolve."
 README = '''@UNAME@ — процедурный CRT-эффект для DaVinci Resolve 18+ (Studio / Free*)
 =========================================================================
 
-УСТАНОВКА
-  macOS   — двойной клик «Установить (macOS).command»
-            (если macOS не открывает: правый клик → Открыть)
-  Windows — двойной клик «Установить (Windows).bat»
-            (для страницы Color — правый клик → Запуск от имени администратора)
+УСТАНОВКА  (подробно — «Инструкция по установке.html», откройте в браузере)
+  macOS   — ПРАВОЙ кнопкой по «Установить (macOS).command» → Открыть → Открыть,
+            затем Enter. Пароль не нужен (только для DCTL, по желанию).
+  Windows — распакуйте архив, двойной клик «Установить (Windows).bat», затем Enter.
   Linux   — bash install-linux.sh
-  После установки перезапустите DaVinci Resolve.
+  После установки полностью перезапустите DaVinci Resolve.
 
 ГДЕ НАЙТИ
   Edit / Cut : Effects → Эффекты → STORYVERSE → CRT → «@NAME@»
@@ -303,10 +303,11 @@ def build_edition(name, demo):
             f.write(dctl)
 
     readme = fill(README, name, demo) + (DEMO_NOTE if demo else "")
-    files = {"Установить (macOS).command": fill(MAC, name, demo),
-             "Установить (Windows).bat": fill(WIN, name, demo).replace(CAT, CAT.replace("/", "\\")).replace("\n", "\r\n"),
-             "install-linux.sh": fill(LINUX, name, demo), "README.txt": readme,
-             "LICENSE.txt": fill(LICENSE, name, demo)}
+    spec = {"name": name, "code": "CRT", "scripts": None if demo else "crt-pro",
+            "dctl": not demo, "demo": demo}
+    files = {"Установить (macOS).command": SI.mac(spec), "Установить (Windows).bat": SI.win(spec),
+             "install-linux.sh": SI.linux(spec), "Инструкция по установке.html": SI.guide_html(spec),
+             "README.txt": readme, "LICENSE.txt": fill(LICENSE, name, demo)}
     for fn, txt in files.items():
         with open(os.path.join(out, fn), "w", encoding="utf-8", newline="") as f:
             f.write(txt)
