@@ -91,26 +91,43 @@ def linux(s):
     return "\n".join(L)
 
 
+CONTACT = "__CONTACT__"   # почта/контакт поддержки — подставить, когда заказчик пришлёт
+YEAR = "2026"
+RED = "#B3302B"            # фирменный красный STORYVERSE (приглушённый)
+
+ICON = {  # простые монохромные значки систем (SVG, цвет = currentColor)
+    "macOS": '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M16.4 12.6c0-2.5 2-3.7 2.1-3.8-1.2-1.7-3-1.9-3.6-2-1.5-.2-3 .9-3.8.9-.8 0-2-.9-3.3-.9-1.7 0-3.3 1-4.1 2.5-1.8 3.1-.5 7.6 1.3 10.1.8 1.2 1.8 2.6 3.1 2.5 1.3-.1 1.7-.8 3.2-.8s1.9.8 3.2.8c1.3 0 2.2-1.2 3-2.4.9-1.4 1.3-2.7 1.3-2.8-.1 0-2.4-.9-2.4-4.1zM14 5.2c.7-.8 1.1-2 1-3.2-1 .1-2.2.7-2.9 1.5-.6.7-1.2 1.9-1 3.1 1.1.1 2.2-.6 2.9-1.4z"/></svg>',
+    "Windows": '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M2 4.5l8.2-1.1v7.9H2zm9.2-1.3L22 1.7v9.6H11.2zM2 12.3h8.2v7.9L2 19.1zm9.2 0H22V22l-10.8-1.5z"/></svg>',
+    "Linux": '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 2c-2.2 0-3.6 1.8-3.6 4.4 0 1.3.3 2.2-.4 3.4-.8 1.4-2.8 3.6-2.8 6.3 0 .8.2 1.5.5 2.1-.7.3-1.7.6-1.7 1.5 0 1 1.6 1.2 3.2 1.6 1.2.3 2 .7 2.6.7.8 0 1.2-.5 1.5-.9h1.4c.3.4.7.9 1.5.9.6 0 1.4-.4 2.6-.7 1.6-.4 3.2-.6 3.2-1.6 0-.9-1-1.2-1.7-1.5.3-.6.5-1.3.5-2.1 0-2.7-2-4.9-2.8-6.3-.7-1.2-.4-2.1-.4-3.4C15.6 3.8 14.2 2 12 2zm-1.4 4c.5 0 .8.5.8 1.1s-.3 1.1-.8 1.1-.8-.5-.8-1.1.4-1.1.8-1.1zm2.8 0c.5 0 .8.5.8 1.1s-.3 1.1-.8 1.1-.8-.5-.8-1.1.3-1.1.8-1.1zM12 9.2c.8 0 1.9.6 1.9 1s-1.1.9-1.9.9-1.9-.5-1.9-.9 1.1-1 1.9-1z"/></svg>',
+}
+
 GUIDE_CSS = """
-:root{color-scheme:dark}*{box-sizing:border-box}
-body{margin:0;background:#0e0f14;color:#e6e7ee;font:16px/1.6 -apple-system,Segoe UI,Roboto,sans-serif}
-main{max-width:760px;margin:0 auto;padding:48px 20px 80px}
-.brand{letter-spacing:.35em;color:#8a8c98;font-size:12px}
-h1{font-size:40px;margin:6px 0 4px}h2{margin:40px 0 10px;font-size:22px}
-.sub{color:#a9abb8;margin:0 0 24px}
-.card{background:#15161c;border:1px solid #25262e;border-radius:14px;padding:18px 22px;margin:14px 0}
-ol{padding-left:22px}li{margin:6px 0}code{background:#1d1e26;padding:2px 6px;border-radius:6px;color:#c9bcff}
-.os{display:inline-block;background:#221d3d;color:#c9bcff;border-radius:8px;padding:2px 10px;font-size:13px;margin-bottom:6px}
-.warn{border-color:#5a4a1d;background:#1c1810}
-dt{font-weight:600;margin-top:14px}dd{margin:4px 0 0 0;color:#c9cad4}
-.path{font-family:ui-monospace,Menlo,monospace;font-size:13px;color:#9d8cff;word-break:break-all}
+:root{color-scheme:dark;--red:#B3302B;--bg:#141416;--card:#1c1c1f;--line:#2c2c30}*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:#e8e8ea;font:16px/1.6 -apple-system,Segoe UI,Roboto,sans-serif}
+main{max-width:760px;margin:0 auto;padding:48px 20px 40px}
+.brand{letter-spacing:.35em;color:var(--red);font-size:12px;font-weight:600}
+h1{font-size:40px;margin:6px 0 4px}h2{margin:40px 0 10px;font-size:22px;padding-left:12px;border-left:3px solid var(--red)}
+.sub{color:#a6a6ad;margin:0 0 24px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 22px;margin:14px 0}
+ol{padding-left:22px}li{margin:6px 0}li::marker{color:var(--red);font-weight:600}
+code{background:#26262a;padding:2px 6px;border-radius:6px;color:#f0c9c6}
+.os{display:inline-flex;align-items:center;gap:8px;color:#fff;font-weight:600;font-size:15px;margin-bottom:4px}
+.os svg{color:var(--red)}
+.warn{border-color:#5c2a27;background:#221716}
+dt{font-weight:600;margin-top:14px}dd{margin:4px 0 0 0;color:#c8c8ce}
+.path{font-family:ui-monospace,Menlo,monospace;font-size:13px;color:#e07a73;word-break:break-all}
+a{color:#e07a73}
+footer{max-width:760px;margin:0 auto;padding:22px 20px 48px;border-top:1px solid var(--line);color:#8e8e96;font-size:13px}
+footer b{color:#e8e8ea}
 """
 
 
 def guide_html(s):
     n, code = s["name"], s["code"]
     items = _items(s)
-    rows = "".join(f"<li>{lbl}: <span class='path'>…/Fusion/{dst}/</span></li>" for _, dst, lbl in items)
+    fuse = f"{code}Core{'Demo' if s.get('demo') else ''}.fuse"
+    rows = "".join(f"<li>{lbl}: <span class='path'>…/Fusion/{dst}/" + (fuse if src == "Fuses" else "") + "</span></li>"
+                   for src, dst, lbl in items)
     dctl_mac = ("<li>Если установщик спросит про <b>DCTL для страницы Color</b> — это по желанию (нужна Resolve Studio). "
                 "Нажмите <code>y</code> и введите пароль от Mac (символы при вводе не видны — это нормально), "
                 "или просто <code>Enter</code>, чтобы пропустить.</li>") if s.get("dctl") else ""
@@ -124,18 +141,18 @@ def guide_html(s):
 <h1>{n}</h1><p class="sub">Инструкция по установке в DaVinci Resolve 18+ · около 1 минуты</p>
 {demo}
 <h2>Установка</h2>
-<div class="card"><span class="os">macOS</span><ol>
+<div class="card"><span class="os">{ICON["macOS"]}macOS</span><ol>
 <li>Распакуйте архив (двойной клик по .zip).</li>
 <li><b>Правой кнопкой</b> по файлу <code>Установить (macOS).command</code> → <b>Открыть</b> → в окне ещё раз <b>Открыть</b>.
 <br><small>Обычный двойной клик macOS может заблокировать: файл не из App Store. Правый клик → «Открыть» — штатный способ, это нужно только в первый раз.</small></li>
 <li>В открывшемся окне нажмите <code>Enter</code> — начнётся установка.</li>
 {dctl_mac}
 <li>Когда появится «Готово!», полностью закройте Resolve (<code>Cmd+Q</code>) и откройте снова.</li></ol></div>
-<div class="card"><span class="os">Windows</span><ol>
+<div class="card"><span class="os">{ICON["Windows"]}Windows</span><ol>
 <li>Распакуйте архив (правой кнопкой → «Извлечь всё»). Из самого .zip не запускайте.</li>
 <li>Двойной клик <code>Установить (Windows).bat</code>. Если Windows покажет «Система Windows защитила ваш компьютер» — «Подробнее» → «Выполнить в любом случае».</li>
 <li>Нажмите <code>Enter</code>{" (DCTL — по желанию: <code>y</code>)" if s.get("dctl") else ""}. Затем перезапустите Resolve.</li></ol></div>
-<div class="card"><span class="os">Linux</span><ol><li><code>bash install-linux.sh</code> → <code>Enter</code> → перезапустите Resolve.</li></ol></div>
+<div class="card"><span class="os">{ICON["Linux"]}Linux</span><ol><li><code>bash install-linux.sh</code> → <code>Enter</code> → перезапустите Resolve.</li></ol></div>
 
 <h2>Где найти</h2>
 <div class="card"><ol>
@@ -155,6 +172,9 @@ def guide_html(s):
 {"<dt>Кнопка «Окно пресетов» ничего не открывает</dt><dd>Запустите установщик ещё раз (окно ставится в <span class='path'>Fusion/Scripts/Comp/" + s['scripts'] + "/</span>) и перезапустите Resolve.</dd>" if s.get("scripts") else ""}
 {"<dt>Нет в списке DCTL на странице Color</dt><dd>DCTL работает только в Resolve Studio и ставится по желанию — запустите установщик и нажмите <code>y</code> на вопросе про DCTL.</dd>" if s.get("dctl") else ""}
 <dt>Как удалить</dt><dd>Удалите папки:<ul>{rows}</ul></dd>
+<dt>Ничего не помогло</dt><dd>Напишите нам: <a href="mailto:{CONTACT}">{CONTACT}</a> — приложите скриншот и версию Resolve и системы.</dd>
 </dl></div>
-</main></body></html>
+</main>
+<footer><b>© {YEAR} STORYVERSE.</b> Все права защищены.<br>
+Поддержка: <a href="mailto:{CONTACT}">{CONTACT}</a></footer></body></html>
 """
