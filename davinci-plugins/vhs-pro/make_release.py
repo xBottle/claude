@@ -240,6 +240,26 @@ def build_edition(name, demo):
     return m
 
 
+def make_cover(img, title, sub):
+    """Сдержанная обложка 1920x1080: кадр эффекта, затемнение снизу, заголовок слева."""
+    from PIL import Image, ImageDraw, ImageFont
+    W, H = 1920, 1080
+    cover = img.convert("RGB").resize((W, H), Image.LANCZOS)
+    shade = Image.new("L", (W, H))
+    sp = shade.load()
+    for y in range(H):
+        v = int(235 * max(0.0, (y / H - 0.35) / 0.65) ** 1.4)
+        for x in range(W):
+            sp[x, y] = int(v * (1 - 0.35 * x / W))
+    cover = Image.composite(Image.new("RGB", (W, H), (8, 8, 12)), cover, shade)
+    d = ImageDraw.Draw(cover)
+    d.text((W - 110, 96), "S T O R Y V E R S E", font=ImageFont.truetype(FONT_R, 26), fill=(200, 202, 210), anchor="ra")
+    d.text((104, 770), title, font=ImageFont.truetype(FONT_B, 150), fill=(245, 245, 248), anchor="ls")
+    d.text((110, 840), sub, font=ImageFont.truetype(FONT_R, 40), fill=(205, 207, 215), anchor="ls")
+    d.line([(110, 880), (230, 880)], fill=(255, 255, 255), width=3)
+    return cover
+
+
 def make_store(m):
     from PIL import Image, ImageDraw, ImageFont
     st = os.path.join(DIST, "Для магазина")
@@ -254,14 +274,8 @@ def make_store(m):
         sheet.paste(Image.open(os.path.join(HERE, "icons", f"preset_{i}.png")), (x, y))
         d.text((x + 4, y + h + 8), nm, font=f, fill=(214, 216, 226))
     sheet.save(os.path.join(st, "Пресеты.png"))
-    W, H = 1920, 1080
-    cover = Image.open(os.path.join(HERE, "store_assets", "full_6.png")).resize((W, H), Image.LANCZOS)
-    cover = Image.blend(cover, Image.new("RGB", (W, H), (10, 10, 16)), 0.45)
-    d = ImageDraw.Draw(cover)
-    for off, col in ((-7, (255, 60, 140)), (7, (40, 220, 255)), (0, (255, 255, 255))):
-        d.text((W // 2 + off, H // 2 - 60), "VHS PRO", font=ImageFont.truetype(FONT_B, 230), fill=col, anchor="mm")
-    d.text((W // 2, H // 2 + 110), "tape  ·  camcorder  ·  DaVinci Resolve", font=ImageFont.truetype(FONT_R, 46),
-           fill=(230, 231, 238), anchor="mm")
+    cover = make_cover(Image.open(os.path.join(HERE, "store_assets", "full_6.png")), "VHS PRO",
+                       "Кассета и камкордер для DaVinci Resolve")
     cover.save(os.path.join(st, "Обложка.png"))
     shutil.copy2(os.path.join(HERE, "store_assets", "Страница товара.md"), os.path.join(st, "Страница товара.md"))
     with open(os.path.join(st, "Описание товара.txt"), "w", encoding="utf-8") as f:

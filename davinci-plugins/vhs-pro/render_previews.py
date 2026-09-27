@@ -66,6 +66,9 @@ def compile_kernel(tmp):
 
 
 def scene():
+    photo = os.path.join(HERE, "store_assets", "scene.png")
+    if os.path.exists(photo):  # кадр заказчика — превью на реальной картинке
+        return Image.open(photo).convert("RGB").resize((W, H), Image.LANCZOS)
     im = Image.new("RGB", (W, H)); d = ImageDraw.Draw(im)
     for y in range(H):
         t = y / H; d.line([(0, y), (W, y)], fill=(int(40 + 180 * t), int(90 + 100 * t), int(200 - 60 * t)))

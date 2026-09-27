@@ -13,7 +13,7 @@
 | `CRT Presets.lua` | окно пресетов (UIManager): плитка пресетов на ui:Tree (3 колонки, своя прокрутка), узоры, свои пресеты с превью (`ExportCurrentFrameAsStill`), синхронизация списка в шаблоне |
 | `crt_pro_data.lua` | данные для окна: `python3 gen_data.py build_crt_pro_2.py` после правок генератора |
 | `CRT Pro v2.dctl` | упрощённая версия для страницы Color (ASCII-подписи, без времени/размытия) |
-| `icons/` | превью пресетов/узоров — рендер реального ядра на CPU (C-копия ядра, см. историю в git) |
+| `icons/` | превью пресетов — `python3 render_previews.py` (ядро через gcc на CPU, сцена `store_assets/scene_eye.png` — фото заказчика); также пишет cover_bg.png и иконку эффекта. Узоры pattern_*.png — старые |
 | `make_release.py` | чистый пакет: payload + установщики macOS/Windows/Linux + README/LICENSE; `dist/Для магазина/` (обложка из `store_assets/`, сетка пресетов, описание) |
 | публичные пути | `Effects/STORYVERSE/CRT/`, `Scripts/Comp/crt-pro/`, `LUT/STORYVERSE/` (make_release.py подменяет пути исходников v2) |
 | `validate_crt_pro.lua` | валидатор (запускается через fuscript на Mac при `--install`) |
@@ -26,6 +26,7 @@
 `dist/VHS Pro.zip` + `dist/VHS Pro Demo.zip` (3 пресета, ChromaShift/Snow/LineJitter, Text+ надпись, нода VHSCoreDemo).
 Ядро `vhs_core_template.fuse` (1 проход): камера с рук (Lua считает camX/camY/camR/camS), трекинг, полоса головок,
 залом, пауза/перемотка, размытие Y/IQ по строке, цвет, снег/выпадения, OSD (шрифт `font.inc`, строки упакованы в T0..T17).
+Сцена превью/обложки — `store_assets/scene.png` (кадр клипа заказчика). Обложки обоих эффектов — сдержанный стиль: кадр, затемнение снизу, заголовок слева, STORYVERSE справа сверху.
 Окно пресетов `VHS Presets.lua` (копия окна CRT: вместо узоров — кнопки режима магнитофона и быстрые тумблеры), данные `vhs_pro_data.lua` пишет build_vhs_pro.py.
 Пути: `Effects/STORYVERSE/VHS/`, Fuses/VHSCore.fuse, `Scripts/Comp/vhs-pro/`. В демо окна нет.
 

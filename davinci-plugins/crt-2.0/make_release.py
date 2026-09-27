@@ -212,35 +212,27 @@ DaVinci Resolve 18 и новее (проверено на 20). Страница 
 
 
 def make_cover():
-    """Обложка 1920x1080: полноразмерный рендер ядра + крупный заголовок с градиентом."""
-    from PIL import Image, ImageDraw, ImageFont, ImageChops, ImageFilter
+    """Сдержанная обложка 1920x1080 (как у VHS Pro): кадр эффекта, затемнение снизу, заголовок слева."""
+    from PIL import Image, ImageDraw, ImageFont
     W, H = 1920, 1080
-    bg = Image.open(os.path.join(HERE, "store_assets", "cover_bg.png")).convert("RGB").resize((W, H), Image.LANCZOS)
-    shade = Image.new("RGB", (W, H), (10, 10, 16))
-    cover = Image.blend(bg, shade, 0.45)
     bold = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
     reg = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
-    f1, f2 = ImageFont.truetype(bold, 230), ImageFont.truetype(reg, 46)
-    mask = Image.new("L", (W, H), 0)
-    ImageDraw.Draw(mask).text((W // 2, H // 2 - 60), "CRT PRO", font=f1, fill=255, anchor="mm")
-    grad = Image.new("RGB", (W, H))
-    gp = grad.load()
-    for x in range(W):
-        t = x / W
-        c = (int(157 * (1 - t) + 34 * t), int(140 * (1 - t) + 211 * t), int(255 * (1 - t) + 238 * t))
-        for y in range(H):
-            gp[x, y] = c
-    glow = Image.new("RGB", (W, H), (0, 0, 0))
-    glow.paste(grad, (0, 0), mask.filter(ImageFilter.GaussianBlur(30)))
-    cover = ImageChops.add(cover, glow.point(lambda v: int(v * 0.6)))
-    for off, col in ((-6, (255, 60, 120)), (6, (40, 220, 255))):
-        cover.paste(Image.new("RGB", (W, H), col), (0, 0), ImageChops.offset(mask, off, 0).point(lambda v: int(v * 0.4)))
-    cover.paste(grad, (0, 0), mask)
+    from PIL import ImageEnhance
+    cover = Image.open(os.path.join(HERE, "store_assets", "cover_bg.png")).convert("RGB").resize((W, H), Image.LANCZOS)
+    cover = ImageEnhance.Brightness(cover).enhance(1.9)
+    shade = Image.new("L", (W, H))
+    sp = shade.load()
+    for y in range(H):
+        v = int(235 * max(0.0, (y / H - 0.35) / 0.65) ** 1.4)
+        for x in range(W):
+            sp[x, y] = int(v * (1 - 0.35 * x / W))
+    cover = Image.composite(Image.new("RGB", (W, H), (8, 8, 12)), cover, shade)
     d = ImageDraw.Draw(cover)
-    d.text((W // 2, H // 2 + 110), "procedural CRT  ·  DaVinci Resolve", font=f2, fill=(230, 231, 238), anchor="mm")
-    d.rounded_rectangle([W // 2 - 190, H // 2 + 170, W // 2 + 190, H // 2 + 240], radius=35,
-                        fill=(29, 26, 51), outline=(139, 123, 255), width=3)
-    d.text((W // 2, H // 2 + 205), "18 PRESETS  ·  GPU", font=ImageFont.truetype(reg, 32), fill=(230, 231, 238), anchor="mm")
+    d.text((W - 110, 96), "S T O R Y V E R S E", font=ImageFont.truetype(reg, 26), fill=(200, 202, 210), anchor="ra")
+    d.text((104, 770), "CRT PRO", font=ImageFont.truetype(bold, 150), fill=(245, 245, 248), anchor="ls")
+    d.text((110, 840), "Настоящий кинескоп для DaVinci Resolve", font=ImageFont.truetype(reg, 40),
+           fill=(205, 207, 215), anchor="ls")
+    d.line([(110, 880), (230, 880)], fill=(255, 255, 255), width=3)
     return cover
 
 
