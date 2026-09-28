@@ -370,7 +370,7 @@ def build_fuse(category=None):
         f'    INP["{k}"] = self:AddInput("{k}", "{k}", {{ LINKID_DataType = "Number", '
         f'INPID_InputControl = "SliderControl", INP_Default = {lnum(DEFAULTS[k])} }})' for k in ids)
     read = "    for k, inp in pairs(INP) do V[k] = num(inp, req) end"
-    cat = (category or CATEGORY).replace("/", "\\")
+    cat = (category or CATEGORY).replace("/", "\\\\")
     return (tpl.replace("__PARAM_FIELDS__", fields).replace("__CREATE_INPUTS__", create)
             .replace("__READ_INPUTS__", read).replace("__CURVE__", CURVE_LUA).replace("__CATEGORY__", cat))
 

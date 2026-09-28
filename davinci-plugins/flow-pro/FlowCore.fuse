@@ -9,7 +9,7 @@ Lua на каждом кадре: кривая времени (ремап ско
 
 FuRegisterClass("FlowCore", CT_Tool, {
     REGS_Name = "Flow Core",
-    REGS_Category = "Claude\FLOW",
+    REGS_Category = "Claude\\FLOW",
     REGS_OpIconString = "FLOc",
     REGS_OpDescription = "Flow edit core: speed ramp + camera + shake (GPU)",
     REG_NoMotionBlurCtrls = true,
