@@ -2,3 +2,5 @@ __pycache__/
 *.pyc
 davinci-plugins/crt-2.0/dist/
 davinci-plugins/vhs-pro/dist/
+davinci-plugins/flow-pro/dist-dev/
+davinci-plugins/flow-pro/dist/

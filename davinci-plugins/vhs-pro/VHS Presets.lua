@@ -174,11 +174,11 @@ while reopen do
     end
 
     local function btnStyle(color)
-        return "QPushButton { background:#17181f; color:" .. color .. "; border:1px solid #2b2c36; " ..
+        return "QPushButton { background:#2a2a2a; color:" .. color .. "; border:1px solid #3a3a3a; " ..
             "border-radius:10px; padding:9px; font-weight:600; } QPushButton:hover { border-color:" .. color ..
-            "; background:#1e1f28; }"
+            "; background:#333333; }"
     end
-    local BLUE, WHITE, GREEN, RED = "#9d8cff", "#e6e7ee", "#5eead4", "#fb7185"
+    local BLUE, WHITE, GREEN, RED = "#d0584d", "#e2e2e0", "#e06a5f", "#b8b8b5"
 
     local function iconFor(it)
         if it.thumb and bmd.fileexists(it.thumb) then
@@ -197,9 +197,9 @@ while reopen do
     local TOGGLES = { { "CamOn", "Съёмка с рук" }, { "OSDOn", "Дата и время" },
         { "CreaseOn", "Залом плёнки" }, { "Aspect43", "Формат 4:3" } }
     local function getv(k) local v = 0; pcall(function() v = tool:GetInput(k) or 0 end); return v end
-    local QB = [[QPushButton { background:#101116; color:#c9cad4; border:1px solid #25262e; border-radius:10px; padding:8px; font-weight:600; }
-QPushButton:hover { border:1px solid #22d3ee; }]]
-    local QB_ON = [[QPushButton { background:#0f2230; color:#ffffff; border:2px solid #22d3ee; border-radius:10px; padding:7px; font-weight:700; }]]
+    local QB = [[QPushButton { background:#262626; color:#cfcfcd; border:1px solid #333333; border-radius:10px; padding:8px; font-weight:600; }
+QPushButton:hover { border:1px solid #c9352b; }]]
+    local QB_ON = [[QPushButton { background:#3a211e; color:#ffffff; border:2px solid #c9352b; border-radius:10px; padding:7px; font-weight:700; }]]
     local curMode = math.floor(getv("Mode") + 0.5)
     local modeCells, togCells = {}, {}
     for i = 0, 3 do
@@ -215,26 +215,26 @@ QPushButton:hover { border:1px solid #22d3ee; }]]
         ID = "VHSPresetsWin",
         WindowTitle = DEMO and "VHS PRO — DEMO" or "VHS PRO",
         Geometry = geom,
-        StyleSheet = [[QWidget { background:#0e0f14; color:#e6e7ee; font-size:12px; }
-QLineEdit { background:#15161c; border:1px solid #2b2c36; border-radius:10px; padding:9px; font-size:13px; color:#e6e7ee; }
-QLineEdit:focus { border:1px solid #8b7bff; }]],
+        StyleSheet = [[QWidget { background:#1f1f1f; color:#e2e2e0; font-size:12px; }
+QLineEdit { background:#282828; border:1px solid #3a3a3a; border-radius:10px; padding:9px; font-size:13px; color:#e2e2e0; }
+QLineEdit:focus { border:1px solid #c9352b; }]],
         ui:VGroup{
             Spacing = 8,
             ui:Label{ Text = "<img src='" .. DIR .. "icons/title.png'>", Alignment = { AlignHCenter = true }, Weight = 0 },
             ui:Tree{ ID = "PresetList", Weight = 1, MinimumSize = { 560, 340 },
                 IconSize = { 128, 72 }, HeaderHidden = true, RootIsDecorated = false,
                 SelectionMode = "SingleSelection", ColumnCount = 1, UniformRowHeights = true,
-                StyleSheet = [[QTreeWidget { background:#0e0f14; border:1px solid #25262e; border-radius:12px; padding:6px; outline:0; }
-QTreeWidget::item { color:#d6d8e2; font-size:13px; padding:4px 6px; border-radius:10px; }
-QTreeWidget::item:hover { background:#1b1c24; }
-QTreeWidget::item:selected { background:#221d3d; color:#ffffff; }
-QScrollBar:vertical { background:#0e0f14; width:8px; }
-QScrollBar::handle:vertical { background:#34353f; border-radius:4px; min-height:30px; }
+                StyleSheet = [[QTreeWidget { background:#1f1f1f; border:1px solid #333333; border-radius:12px; padding:6px; outline:0; }
+QTreeWidget::item { color:#d4d4d2; font-size:13px; padding:4px 6px; border-radius:10px; }
+QTreeWidget::item:hover { background:#2c2c2c; }
+QTreeWidget::item:selected { background:#43231f; color:#ffffff; }
+QScrollBar:vertical { background:#1f1f1f; width:8px; }
+QScrollBar::handle:vertical { background:#4a4a4a; border-radius:4px; min-height:30px; }
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height:0; }]] },
-            ui:Label{ Weight = 0, StyleSheet = "color:#22d3ee; font-weight:600; letter-spacing:1px; margin-top:8px;",
+            ui:Label{ Weight = 0, StyleSheet = "color:#c9352b; font-weight:600; letter-spacing:1px; margin-top:8px;",
                 Text = "МАГНИТОФОН" },
             ui:HGroup{ Weight = 0, Spacing = 6, tunpack(modeCells) },
-            ui:Label{ Weight = 0, StyleSheet = "color:#22d3ee; font-weight:600; letter-spacing:1px; margin-top:4px;",
+            ui:Label{ Weight = 0, StyleSheet = "color:#c9352b; font-weight:600; letter-spacing:1px; margin-top:4px;",
                 Text = "КАМЕРА И КАДР" },
             ui:HGroup{ Weight = 0, Spacing = 6, tunpack(togCells) },
             ui:VGap(0, 1),
@@ -253,9 +253,9 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height:0; }]] },
                 ui:Button{ ID = "BtnDelete", Text = "Удалить", StyleSheet = btnStyle(RED) },
             },
             ui:Button{ ID = "BtnThumb", Text = "Снять превью с текущего кадра (для своего ★)", StyleSheet = btnStyle(WHITE), Weight = 0 },
-            ui:Label{ ID = "Status", Text = statusText, Weight = 0, WordWrap = true, StyleSheet = "color:#9d8cff;" },
+            ui:Label{ ID = "Status", Text = statusText, Weight = 0, WordWrap = true, StyleSheet = "color:#d0584d;" },
             ui:Label{ Text = DEMO and "VHS PRO  ·  DEMO  ·  by STORYVERSE" or "VHS PRO  ·  by STORYVERSE", Weight = 0, Alignment = { AlignHCenter = true },
-                StyleSheet = "color:#4a4c58; font-size:10px; letter-spacing:1px;" },
+                StyleSheet = "color:#6a6a68; font-size:10px; letter-spacing:1px;" },
         },
     })
     local itm = win:GetItems()

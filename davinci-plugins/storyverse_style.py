@@ -70,19 +70,45 @@ def preset_sheet(thumbs, names, cols=3):
 
 
 def window_title(name, sub):
-    """Шапка окна пресетов 330x64: название градиентом (фиолетовый → бирюзовый), плашка PRESETS, подпись."""
+    """Шапка окна пресетов 330x64 (палитра DaVinci): название белым, красная черта-акцент, плашка PRESETS."""
     W, H = 330, 64
-    im = Image.new("RGB", (W, H), BG)
-    mask = Image.new("L", (W, H), 0)
-    ImageDraw.Draw(mask).text((8, 2), name, font=ImageFont.truetype(FONT_B, 36), fill=255)
-    grad = Image.new("RGB", (W, H))
-    for x in range(W):
-        t = min(1.0, x / 190)
-        grad.paste((int(157 * (1 - t) + 34 * t), int(140 * (1 - t) + 211 * t), int(255 * (1 - t) + 238 * t)),
-                   (x, 0, x + 1, H))
-    im.paste(grad, (0, 0), mask)
+    im = Image.new("RGB", (W, H), (31, 31, 31))
     d = ImageDraw.Draw(im)
-    d.rounded_rectangle([232, 12, 322, 36], radius=12, fill=(29, 26, 51), outline=(139, 123, 255), width=1)
-    d.text((277, 24), "PRESETS", font=ImageFont.truetype(FONT_R, 11), fill=(230, 231, 238), anchor="mm")
-    d.text((10, 50), sub, font=ImageFont.truetype(FONT_R, 11), fill=(90, 92, 104))
+    d.text((10, 2), name, font=ImageFont.truetype(FONT_B, 34), fill=(236, 236, 234))
+    d.rectangle([11, 44, 41, 46], fill=(201, 53, 43))
+    d.rounded_rectangle([232, 12, 322, 36], radius=12, fill=(40, 40, 40), outline=(201, 53, 43), width=1)
+    d.text((277, 24), "PRESETS", font=ImageFont.truetype(FONT_R, 11), fill=(226, 226, 224), anchor="mm")
+    d.text((50, 50), sub, font=ImageFont.truetype(FONT_R, 11), fill=(120, 120, 118), anchor="lm")
     return im
+
+
+# Палитра окон пресетов — как интерфейс DaVinci Resolve: нейтральный серый, красный STORYVERSE только акцентом.
+WINDOW_PALETTE = {
+    "#0e0f14": "#1f1f1f",  # фон окна
+    "#15161c": "#282828",  # поле ввода
+    "#2b2c36": "#3a3a3a",  # рамки полей и кнопок
+    "#8b7bff": "#c9352b",  # фокус поля
+    "#25262e": "#333333",  # рамки списка/узоров
+    "#1b1c24": "#2c2c2c",  # наведение на строку
+    "#221d3d": "#43231f",  # выделенная строка
+    "#34353f": "#4a4a4a",  # полоса прокрутки
+    "#101116": "#262626",  # фон кнопок-узоров
+    "#22d3ee": "#c9352b",  # акцент: подписи разделов, выбранный узор
+    "#0f2230": "#3a211e",  # фон включённой кнопки
+    "#c9cad4": "#cfcfcd",  # текст быстрых кнопок
+    "#17181f": "#2a2a2a",  # фон кнопок
+    "#1e1f28": "#333333",  # наведение на кнопку
+    "#9d8cff": "#d0584d",  # статус / акцентный текст
+    "#e6e7ee": "#e2e2e0",  # основной текст
+    "#5eead4": "#e06a5f",  # «Сохранить» — акцентные кнопки
+    "#fb7185": "#b8b8b5",  # «Удалить» — спокойный серый
+    "#d6d8e2": "#d4d4d2",  # текст строк списка
+    "#4a4c58": "#6a6a68",  # подвал
+}
+
+
+def recolor_window(src):
+    """Перекрашивает Lua-окно пресетов в палитру STORYVERSE/DaVinci."""
+    for a, b in WINDOW_PALETTE.items():
+        src = src.replace(a, b).replace(a.upper(), b)
+    return src

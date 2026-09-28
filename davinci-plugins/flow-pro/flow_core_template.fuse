@@ -1,0 +1,272 @@
+--[[
+Flow Core — GPU-ядро эффекта Flow Pro (flow edit одной нодой).
+Lua на каждом кадре: кривая времени (ремап скорости по длине клипа), камера
+(наезд/слайд/поворот по своей кривой), тряска с огибающей, слайд-смаз на входе/
+выходе, затемнение. GPU: выборка 2–4 кадров, смешивание, смаз вдоль движения,
+края (зеркало/чёрные/автозум), цвет, виньетка, общий микс.
+Файл собран автоматически из build_flow_pro.py — правь шаблон, не результат.
+]]
+
+FuRegisterClass("FlowCore", CT_Tool, {
+    REGS_Name = "Flow Core",
+    REGS_Category = "__CATEGORY__",
+    REGS_OpIconString = "FLOc",
+    REGS_OpDescription = "Flow edit core: speed ramp + camera + shake (GPU)",
+    REG_NoMotionBlurCtrls = true,
+    REG_NoBlendCtrls = true,
+    REG_OpNoMask = true,
+    REG_TimeVariant = true,
+    REG_SupportsDoD = false,
+    REG_Version = 1,
+})
+
+FlowParams = [[
+    float w; float h; float s;
+__PARAM_FIELDS__
+    float wAB; float wCD; float camX; float camY; float camR; float camS;
+    float blurX; float blurY; float fade;
+]]
+
+FlowKernel = [[
+__DEVICE__ float cl01(float v) { return _fminf(_fmaxf(v, 0.0f), 1.0f); }
+/* отражение координаты в [0, n] — края «зеркалом», как Edges = Mirror в Transform */
+__DEVICE__ float mirror1(float v, float n) {
+    float p = 2.0f * n;
+    v = v - _floor(v / p) * p;
+    return v > n ? p - v : v;
+}
+
+__KERNEL__ void FlowKernel(__CONSTANTREF__ FlowParams *p, __TEXTURE2D__ fa, __TEXTURE2D__ fb, __TEXTURE2D__ fc,
+                           __TEXTURE2D__ fd, __TEXTURE2D__ org, __TEXTURE2D_WRITE__ dst)
+{
+    DEFINE_KERNEL_ITERATORS_XY(x, y);
+    if (x >= (int)p->w || y >= (int)p->h) return;
+    float W = p->w, H = p->h;
+    float fx = (float)x + 0.5f, fy = (float)y + 0.5f;
+    float cx = W * 0.5f, cy = H * 0.5f;
+
+    /* камера: сдвиг, поворот, масштаб */
+    float dx = fx - cx - p->camX * W, dy = fy - cy - p->camY * H;
+    float cr = _cosf(p->camR), sr = _sinf(p->camR);
+    float sx = (cr * dx + sr * dy) / p->camS + cx;
+    float sy = (-sr * dx + cr * dy) / p->camS + cy;
+
+    /* смаз вдоль движения камеры (тряска, наезд, слайд-переход) */
+    int n = (_fabs(p->blurX) + _fabs(p->blurY) > 0.75f) ? 9 : 1;
+    float r = 0.0f, g = 0.0f, b = 0.0f, a = 0.0f, ws = 0.0f;
+    for (int i = 0; i < n; i++) {
+        float t = (n > 1) ? ((float)i / (float)(n - 1) - 0.5f) : 0.0f;
+        float wt = (n > 1) ? (1.0f - 1.3f * _fabs(t)) : 1.0f;
+        float px = sx + t * p->blurX, py = sy + t * p->blurY;
+        float inside = 1.0f;
+        if (p->EdgeMode > 0.5f && p->EdgeMode < 1.5f) {
+            if (px < 0.0f || px > W || py < 0.0f || py > H) inside = 0.0f;
+        } else {
+            px = mirror1(px, W); py = mirror1(py, H);
+        }
+        float u = px / W, v = py / H;
+        float4 ca = _tex2DVecN(fa, u, v, 15);
+        float4 cb = _tex2DVecN(fb, u, v, 15);
+        float tr = ca.x + (cb.x - ca.x) * p->wAB, tg = ca.y + (cb.y - ca.y) * p->wAB;
+        float tb = ca.z + (cb.z - ca.z) * p->wAB, ta = ca.w + (cb.w - ca.w) * p->wAB;
+        if (p->wCD > 0.0f) {  /* смешивание соседних кадров на большой скорости */
+            float4 cc = _tex2DVecN(fc, u, v, 15);
+            float4 cd = _tex2DVecN(fd, u, v, 15);
+            tr += ((cc.x + cd.x) * 0.5f - tr) * p->wCD; tg += ((cc.y + cd.y) * 0.5f - tg) * p->wCD;
+            tb += ((cc.z + cd.z) * 0.5f - tb) * p->wCD; ta += ((cc.w + cd.w) * 0.5f - ta) * p->wCD;
+        }
+        wt *= inside;
+        r += tr * wt; g += tg * wt; b += tb * wt; a += ta * wt; ws += (n > 1) ? (1.0f - 1.3f * _fabs(t)) : 1.0f;
+    }
+    r /= ws; g /= ws; b /= ws; a /= ws;
+
+    /* цвет */
+    if (p->LookOn > 0.5f) {
+        float ex = _powf(2.0f, p->Exposure);
+        r *= ex; g *= ex; b *= ex;
+        r = (r - 0.5f) * (1.0f + p->Contrast) + 0.5f;
+        g = (g - 0.5f) * (1.0f + p->Contrast) + 0.5f;
+        b = (b - 0.5f) * (1.0f + p->Contrast) + 0.5f;
+        float L = 0.2126f * r + 0.7152f * g + 0.0722f * b;
+        r = L + (r - L) * p->Sat; g = L + (g - L) * p->Sat; b = L + (b - L) * p->Sat;
+        r *= 1.0f + p->Warmth * 0.12f; b *= 1.0f - p->Warmth * 0.12f;
+        if (p->Vignette > 0.0f) {
+            float vx = (fx - cx) / W * 1.6f, vy = (fy - cy) / H * 1.6f;
+            float vv = 1.0f - p->Vignette * cl01(vx * vx + vy * vy - 0.12f);
+            r *= vv; g *= vv; b *= vv;
+        }
+    }
+    r *= p->fade; g *= p->fade; b *= p->fade;
+
+    /* общий микс с оригиналом */
+    float4 o = _tex2DVecN(org, fx / W, fy / H, 15);
+    float m = p->GlobalMix;
+    r = o.x + (r - o.x) * m; g = o.y + (g - o.y) * m; b = o.z + (b - o.z) * m; a = o.w + (a - o.w) * m;
+    _tex2DVec4Write(dst, x, y, make_float4(r, g, b, a));
+}
+]]
+
+function Create()
+__CREATE_INPUTS__
+    InImage = self:AddInput("Input", "Input", { LINKID_DataType = "Image", LINK_Main = 1 })
+    InOrig = self:AddInput("Original", "Original", { LINKID_DataType = "Image", LINK_Main = 2, INP_Required = false })
+    OutImage = self:AddOutput("Output", "Output", { LINKID_DataType = "Image", LINK_Main = 1 })
+end
+
+local function num(inp, req) local v = inp:GetValue(req); return v and v.Value or 0 end
+local function clamp(v, lo, hi) return math.max(lo, math.min(hi, v)) end
+
+-- кривая времени/движения (та же формула стоит в выражении TimeStretcher — генерируется из build_flow_pro.py)
+local curve = __CURVE__
+
+local function wave(ts, off)  -- гладкий «шум» для тряски
+    return 0.5 * math.sin(ts * 6.13 + off) + 0.3 * math.sin(ts * 13.71 + off * 1.7) + 0.2 * math.sin(ts * 29.3 + off * 2.3)
+end
+
+function Process(req)
+    local img = InImage:GetValue(req)
+    local org = InOrig:GetValue(req) or img
+    local t = req.Time
+    local V = {}
+__READ_INPUTS__
+    local W, H = img.Width, img.Height
+
+    -- длина клипа: из диапазона композиции (эффект на клипе = длина клипа) или вручную
+    local t0, t1 = 0, 100
+    pcall(function()
+        local at = self.Comp:GetAttrs()
+        t0, t1 = at.COMPN_RenderStart or 0, at.COMPN_RenderEnd or 100
+    end)
+    if V.ClipLen >= 2 then t1 = t0 + math.floor(V.ClipLen) - 1 end
+    local Lm1 = math.max(1, t1 - t0)
+    local fps = 24
+    pcall(function() fps = self.Comp:GetPrefs("Comp.FrameFormat.Rate") or 24 end)
+    if not fps or fps <= 0 then fps = 24 end
+    local function xof(tt) return clamp((tt - t0) / Lm1, 0, 1) end
+
+    -- 1. ремап скорости
+    local k = 1 + V.RampStrength * 4
+    local s, sp = t, 1
+    local remap = V.RampOn > 0.5 and V.Quality < 1.5
+    if remap then
+        local x = xof(t)
+        s = t0 + Lm1 * curve(x, V.RampType, k, V.RampAmount, V.HoldPoint)
+        local e = 1 / Lm1
+        local xa, xb = math.max(0, x - e), math.min(1, x + e)
+        if xb > xa then
+            sp = (curve(xb, V.RampType, k, V.RampAmount, V.HoldPoint) - curve(xa, V.RampType, k, V.RampAmount, V.HoldPoint)) / (xb - xa)
+        end
+    end
+    s = clamp(s, t0, t1)
+    local fa = math.floor(s)
+    local wAB = s - fa
+    if V.Quality < 0.5 then wAB = (wAB >= 0.5) and 1 or 0 end
+    local cache = {}
+    local function get(tt)
+        tt = clamp(math.floor(tt + 0.5), t0, t1)
+        if tt == t then return img end
+        if cache[tt] then return cache[tt] end
+        local im
+        pcall(function() im = InImage:GetSource(tt, req:GetFlags()) end)
+        cache[tt] = im or img
+        return cache[tt]
+    end
+    local A = remap and get(fa) or img
+    local B = (remap and wAB > 0.001) and get(fa + 1) or A
+    local C, D, wCD = A, A, 0
+    local spread = V.TimeBlur * math.max(0, math.abs(sp) - 1) * 0.5
+    if remap and spread >= 0.5 then
+        C, D = get(s - spread), get(s + spread)
+        wCD = math.min(0.7, V.TimeBlur * 0.6)
+    end
+
+    -- 2. камера: движение + тряска + слайд-переход
+    local dirs = { [0] = { -1, 0 }, { 1, 0 }, { 0, 1 }, { 0, -1 } }
+    local function cam(tt, withWhip)
+        local xx = xof(tt)
+        local cx, cy, rr, sc = 0, 0, 0, 1
+        if V.MoveOn > 0.5 then
+            local m = curve(xx, V.MoveType, 1 + V.MoveStrength * 4, 1, 0.35)
+            sc = 1 + V.Zoom * m; cx = V.PanX * m; cy = V.PanY * m; rr = V.Rotate * m
+        end
+        if V.ShakeOn > 0.5 then
+            local mode, d = math.floor(V.ShakeMode + 0.5), math.max(0.02, V.ShakeDecay)
+            local env = 1
+            if mode == 0 then env = (xx < d) and (1 - xx / d) ^ 2 or 0
+            elseif mode == 2 then env = (xx > 1 - d) and ((xx - (1 - d)) / d) ^ 2 or 0 end
+            local ts, sd = tt / fps * V.ShakeFreq, V.ShakeSeed * 17.3
+            local amp = env * V.ShakeAmount
+            cx = cx + amp * V.ShakeX * 0.02 * wave(ts, sd + 1)
+            cy = cy + amp * V.ShakeY * 0.02 * wave(ts, sd + 5)
+            rr = rr + amp * V.ShakeRot * wave(ts, sd + 9)
+        end
+        local wx, wy = 0, 0
+        if withWhip and V.WhipOn > 0.5 then
+            local wf = math.max(1, V.WhipFrames) / Lm1
+            local ein = (V.WhipIn > 0.5 and xx < wf) and (1 - xx / wf) ^ 2 or 0
+            local eout = (V.WhipOut > 0.5 and xx > 1 - wf) and ((xx - (1 - wf)) / wf) ^ 2 or 0
+            local dv = dirs[math.floor(V.WhipDir + 0.5)] or dirs[1]
+            local amt = V.WhipAmount * 0.5 * (eout - ein)
+            wx, wy = dv[1] * amt, dv[2] * amt
+        end
+        return cx, cy, rr, sc, wx, wy
+    end
+    local cx, cy, rr, sc, wx, wy = cam(t, true)
+    -- скорость камеры: разность соседних кадров (центральная, на краях клипа — односторонняя)
+    local ta, tb = math.max(t0, t - 1), math.min(t1, t + 1)
+    local ax, ay, _, _, awx, awy = cam(ta, true)
+    local bx0, by0, _, _, bwx, bwy = cam(tb, true)
+    local dt = math.max(1, tb - ta)
+
+    -- автозум: запас масштаба, чтобы при тряске/повороте не было пустых краёв
+    local fill = 1
+    if V.EdgeMode > 1.5 then
+        local mx, mr = 0, 0
+        for i = 0, 24 do
+            local ax, ay, ar, as = cam(t0 + Lm1 * i / 24, false)
+            mx = math.max(mx, math.abs(ax), math.abs(ay) * H / W); mr = math.max(mr, math.abs(ar))
+            fill = math.max(fill, 1 / math.max(0.2, as))
+        end
+        fill = fill * (1 + 2 * mx + math.sin(math.rad(mr)) * (W / H + 1) * 0.5)
+    end
+
+    local dst = Image({ IMG_Like = img, IMG_DeferAlloc = true })
+    local node = DVIPComputeNode(req, "FlowKernel", FlowKernel, "FlowParams", FlowParams)
+    if not node then OutImage:Set(req, img) return end
+    local p = node:GetParamBlock(FlowParams)
+    for k2, v in pairs(V) do p[k2] = v end
+    p.w, p.h, p.s = W, H, H / 1080
+    p.wAB, p.wCD = wAB, wCD
+    p.camX, p.camY, p.camR, p.camS = cx + wx, cy + wy, math.rad(rr), sc * fill
+    -- смаз = скорость камеры (px за кадр) × сила
+    local bx = ((bx0 - ax) * W * V.MotionBlur + (bwx - awx) * W * V.WhipBlur) / dt
+    local by = ((by0 - ay) * H * V.MotionBlur + (bwy - awy) * H * V.WhipBlur) / dt
+    local lim = 400 * H / 1080
+    p.blurX, p.blurY = clamp(bx, -lim, lim), clamp(by, -lim, lim)
+    -- затемнение из/в чёрный
+    local fade = 1
+    if V.FadeIn >= 1 then fade = fade * clamp((t - t0) / V.FadeIn, 0, 1) end
+    if V.FadeOut >= 1 then fade = fade * clamp((t1 - t) / V.FadeOut, 0, 1) end
+    p.fade = fade
+
+    node:SetParamBlock(p)
+    node:AddSampler("RowSampler", TEX_FILTER_MODE_LINEAR, TEX_ADDRESS_MODE_CLAMP, TEX_NORMALIZED_COORDS_TRUE)
+    node:AddInput("fa", A)
+    node:AddInput("fb", B)
+    node:AddInput("fc", C)
+    node:AddInput("fd", D)
+    node:AddInput("org", org)
+    node:AddOutput("dst", dst)
+    local c0 = os.clock()
+    local ok = node:RunSession(req)
+    if V.PerfOn > 0.5 then
+        local ms = (os.clock() - c0) * 1000
+        print(string.format("[Flow Core] кадр %d → источник %.2f, скорость ×%.2f, %.2f мс (%dx%d)", t, s, sp, ms, W, H))
+    end
+    if not ok then
+        dump(node:GetErrorLog())
+        OutImage:Set(req, img)
+        return
+    end
+    OutImage:Set(req, dst)
+end

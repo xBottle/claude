@@ -30,6 +30,16 @@
 Окно пресетов `VHS Presets.lua` (копия окна CRT: вместо узоров — кнопки режима магнитофона и быстрые тумблеры), данные `vhs_pro_data.lua` пишет build_vhs_pro.py.
 Пути: `Effects/STORYVERSE/VHS/`, Fuses/VHSCore.fuse, `Scripts/Comp/vhs-pro/`. В демо окна нет.
 
+## Flow Pro (`davinci-plugins/flow-pro/`) — В РАЗРАБОТКЕ (папка Claude)
+Flow edit одной нодой по видео-гайду (методичка: `flow-pro/Методичка — Flow Edit (по видео).txt`).
+`python3 build_flow_pro.py --dev-zip` → `dist-dev/Flow Pro (Claude).zip` (установщик в Effects/Claude/FLOW, без инструкций);
+`python3 render_previews.py` — превью: Lua-часть FlowCore.fuse через lua5.1 + ядро через gcc, график кривой поверх.
+Цепочка: InRouter → [OpticalFlow → TimeStretcher(Flow)] → Dissolve-переключатель (Quality=2) → FlowCore.fuse → SoftGlow.
+Кривая времени — одна формула `CURVE_LUA` (Fuse и выражение Source Time TimeStretcher), `curve_py` — её копия для иконок.
+FlowCore берёт 2–4 кадра через InImage:GetSource (ремап), камера/тряска/слайд-смаз/затемнение считаются в Lua.
+Не проверено в Resolve: имена входов TimeStretcher (InterpolationMode) и `comp.RenderStart/End` в выражении.
+Релиза (STORYVERSE, демо, make_release) пока нет — делать по образцу vhs-pro, когда заказчик скажет «публикуем».
+
 ## Папки в Resolve: работа vs публикация (правило заказчика)
 - В разработке эффект ставится в Effects → **Claude** → <КОД> (наша рабочая папка; там же другие рабочие эффекты — не удалять).
 - В **STORYVERSE** → <КОД> эффект попадает ТОЛЬКО из релизного архива (make_release.py / установщик покупателя).
@@ -37,6 +47,7 @@
 
 ## Единый стиль — `davinci-plugins/STYLE.md` + `storyverse_style.py`
 Обложки, иконки библиотеки, листы пресетов, шапки окон — только через storyverse_style.py.
+Окна пресетов — палитра DaVinci (серый) + красный акцент: `SV.recolor_window()` / `WINDOW_PALETTE`; фиолетовый/бирюзовый больше не использовать.
 ⚠ Фото в store_assets/scene.png у CRT (огонь) и VHS (клип) — ВРЕМЕННЫЕ, заказчик пришлёт финальные; таблица замены в STYLE.md.
 Установщики и «Инструкция по установке.html» — только через storyverse_install.py (без пароля; DCTL по вопросу).
 Свои пресеты заказчика хранятся только у него (Fusion/<КОД> Pro User Presets), в архивы не попадают (SHARE_MODE).

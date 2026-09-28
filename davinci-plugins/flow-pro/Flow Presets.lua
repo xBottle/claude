@@ -1,6 +1,6 @@
--- CRT Pro v2 — окно пресетов.
+-- Flow Pro — окно пресетов.
 -- Открывается кнопкой «ОКНО ПРЕСЕТОВ» в Инспекторе эффекта (страница Edit).
--- Список пресетов с превью (прокрутка), узоры пикселей, свои пресеты ★.
+-- Список пресетов с превью (прокрутка), быстрые кнопки, свои пресеты ★.
 
 local function scriptDir()
     local src = debug.getinfo(1, "S").source
@@ -9,30 +9,30 @@ local function scriptDir()
 end
 local DIR = scriptDir()
 local DEMO = false          -- make_release.py ставит true в демо-сборке
-local DEMO_FREE = 5         -- в демо доступны первые 5 пресетов
-local DEMO_MSG = "Это доступно в полной версии CRT Pro."
+local DEMO_FREE = 3         -- в демо доступны первые 3 пресета
+local DEMO_MSG = "Это доступно в полной версии Flow Pro."
 
-local chunk, err = loadfile(DIR .. "crt_pro_data.lua")
-if not chunk then print("[CRT Presets] нет crt_pro_data.lua: " .. tostring(err)) return end
+local chunk, err = loadfile(DIR .. "flow_pro_data.lua")
+if not chunk then print("[Flow Presets] нет flow_pro_data.lua: " .. tostring(err)) return end
 local DATA = chunk()
 
 local FUAPP = fu or app
 local comp = (FUAPP and FUAPP:GetCurrentComp()) or comp
 
--- Нода эффекта: из кнопки приходит готовая (CRT_TOOL), иначе ищем в компе.
-local tool = _G.CRT_TOOL
+-- Нода эффекта: из кнопки приходит готовая (FLOW_TOOL), иначе ищем в компе.
+local tool = _G.FLOW_TOOL
 if not tool and comp then
     local a = comp.ActiveTool and comp:ActiveTool()
-    if a and tostring(a.Name):lower():find("crt") then tool = a end
+    if a and tostring(a.Name):lower():find("flow") then tool = a end
     if not tool then
         for _, t in pairs(comp:GetToolList(false)) do
-            if tostring(t.Name):lower():find("crt") then tool = t break end
+            if tostring(t.Name):lower():find("flow") then tool = t break end
         end
     end
 end
-if not tool then print("[CRT Presets] Нода CRT Pro не найдена.") return end
+if not tool then print("[Flow Presets] Нода Flow Pro не найдена.") return end
 
--- Папка своих пресетов — та же, что у кнопок эффекта (общая с 1.0).
+-- Папка своих пресетов — та же, что у кнопок эффекта.
 local function fusionDir()
     local list, appdata, home = {}, os.getenv("APPDATA"), os.getenv("HOME") or ""
     if appdata and appdata ~= "" then
@@ -45,7 +45,7 @@ local function fusionDir()
     for _, d in ipairs(list) do if bmd.fileexists(d .. "Templates") then return d end end
     return list[1] or ""
 end
-local PRESET_DIR = fusionDir() .. "CRT Pro User Presets/"
+local PRESET_DIR = fusionDir() .. "Flow Pro User Presets/"
 
 local IDS = {}
 for k in pairs(DATA.DEFAULTS) do IDS[#IDS + 1] = k end
@@ -57,7 +57,7 @@ local function applyTable(t, label)
     -- ошибки ScreenWarp/FinalMix в консоли) и часть значений «теряется».
     if comp then
         pcall(function() comp:Lock() end)
-        pcall(function() comp:StartUndo("CRT пресет: " .. label) end)
+        pcall(function() comp:StartUndo("Flow пресет: " .. label) end)
     end
     local failed = 0
     for _, k in ipairs(IDS) do
@@ -71,7 +71,7 @@ local function applyTable(t, label)
         pcall(function() comp:EndUndo(true) end)
         pcall(function() comp:Unlock() end)
     end
-    if failed > 0 then print("[CRT Presets] не применилось параметров: " .. failed) end
+    if failed > 0 then print("[Flow Presets] не применилось параметров: " .. failed) end
 end
 local function current()
     local t = {}
@@ -86,7 +86,7 @@ local function toCode(t)
     for _, k in ipairs(IDS) do
         if type(t[k]) == "number" then parts[#parts + 1] = k .. "=" .. string.format("%.5g", t[k]) end
     end
-    return "CRTPRO1;" .. table.concat(parts, ";")
+    return "FLOWPRO1;" .. table.concat(parts, ";")
 end
 local function fromCode(s)
     local t, n = {}, 0
@@ -100,17 +100,17 @@ local function cleanName(s)
 end
 local function listOwn()
     local names = {}
-    for _, f in ipairs(bmd.readdir(PRESET_DIR .. "*.crtpreset") or {}) do
+    for _, f in ipairs(bmd.readdir(PRESET_DIR .. "*.flowpreset") or {}) do
         if type(f) == "table" and f.Name and not f.IsDir then
-            names[#names + 1] = (f.Name:gsub("%.crtpreset$", ""))
+            names[#names + 1] = (f.Name:gsub("%.flowpreset$", ""))
         end
     end
     table.sort(names)
     return names
 end
--- Список «Пресет» в шаблоне эффекта = встроенные + свои (★), как в 1.0.
+-- Список «Пресет» в шаблоне эффекта = встроенные + свои (★).
 -- Новые пункты видны в эффектах, перетащенных на клип после перезапуска Resolve.
-local TEMPLATE = fusionDir() .. "Templates/Edit/Effects/Claude/CRT/CRT Pro v2.setting"
+local TEMPLATE = fusionDir() .. "Templates/Edit/Effects/Claude/FLOW/Flow Pro.setting"
 local function syncTemplate()
     local ok = pcall(function()
         local src = bmd.readfile(TEMPLATE)
@@ -192,29 +192,32 @@ while reopen do
     local byLabel = {}
     for _, it in ipairs(items) do byLabel[label(it)] = it end
 
-    local PAT_NAMES = {}
-    for _, sec in ipairs(DATA.SECTIONS) do
-        for _, c in ipairs(sec.controls) do if c.id == "PixPattern" then PAT_NAMES = c.options end end
-    end
-    local curPat = -1
-    pcall(function() curPat = math.floor((tool:GetInput("PixPattern") or 0) + 0.5) end)
-    local PAT = [[QPushButton { background:#262626; border:1px solid #333333; border-radius:10px; padding:2px; }
+    -- быстрые кнопки: кривые скорости (иконки-графики) и главные модули
+    local CURVES = DATA.CURVES or {}
+    local TOGGLES = { { "RampOn", "Скорость" }, { "MoveOn", "Наезд" }, { "ShakeOn", "Тряска" },
+        { "WhipOn", "Слайд-смаз" }, { "GlowOn", "Свечение" } }
+    local function getv(k) local v = 0; pcall(function() v = tool:GetInput(k) or 0 end); return v end
+    local QB = [[QPushButton { background:#262626; color:#cfcfcd; border:1px solid #333333; border-radius:10px; padding:8px; font-weight:600; }
 QPushButton:hover { border:1px solid #c9352b; }]]
-    local PAT_SEL = [[QPushButton { background:#3a211e; border:2px solid #c9352b; border-radius:10px; padding:1px; }]]
-    local patRows = {}
-    for r = 0, 9, 5 do
-        local cells = {}
-        for i = r, r + 4 do
-            cells[#cells + 1] = ui:Button{ ID = "pat_" .. i, Text = "", Icon = icon("pattern_" .. i),
-                IconSize = { 96, 54 }, MinimumSize = { 104, 60 }, MaximumSize = { 104, 60 },
-                ToolTip = PAT_NAMES[i + 1] or ("Узор " .. i), StyleSheet = (i == curPat) and PAT_SEL or PAT }
-        end
-        patRows[#patRows + 1] = ui:HGroup{ Weight = 0, Spacing = 6, tunpack(cells) }
+    local QB_ON = [[QPushButton { background:#3a211e; color:#ffffff; border:2px solid #c9352b; border-radius:10px; padding:7px; font-weight:700; }]]
+    local CV = [[QPushButton { background:#262626; border:1px solid #333333; border-radius:10px; padding:2px; }
+QPushButton:hover { border:1px solid #c9352b; }]]
+    local CV_ON = [[QPushButton { background:#3a211e; border:2px solid #c9352b; border-radius:10px; padding:1px; }]]
+    local curType = math.floor(getv("RampType") + 0.5)
+    local modeCells, togCells = {}, {}
+    for i = 0, 5 do
+        modeCells[#modeCells + 1] = ui:Button{ ID = "mode_" .. i, Text = "", Icon = icon("curve_" .. i),
+            IconSize = { 80, 45 }, MinimumSize = { 86, 52 }, MaximumSize = { 96, 52 },
+            ToolTip = CURVES[i + 1] or ("Кривая " .. i), StyleSheet = (i == curType) and CV_ON or CV }
+    end
+    for i, tg in ipairs(TOGGLES) do
+        togCells[#togCells + 1] = ui:Button{ ID = "tog_" .. i, Text = tg[2],
+            StyleSheet = (getv(tg[1]) > 0.5) and QB_ON or QB }
     end
 
     local win = disp:AddWindow({
-        ID = "CRTPresetsWin",
-        WindowTitle = DEMO and "CRT PRO — DEMO" or "CRT PRO",
+        ID = "FlowPresetsWin",
+        WindowTitle = DEMO and "FLOW PRO — DEMO" or "FLOW PRO",
         Geometry = geom,
         StyleSheet = [[QWidget { background:#1f1f1f; color:#e2e2e0; font-size:12px; }
 QLineEdit { background:#282828; border:1px solid #3a3a3a; border-radius:10px; padding:9px; font-size:13px; color:#e2e2e0; }
@@ -232,9 +235,12 @@ QTreeWidget::item:selected { background:#43231f; color:#ffffff; }
 QScrollBar:vertical { background:#1f1f1f; width:8px; }
 QScrollBar::handle:vertical { background:#4a4a4a; border-radius:4px; min-height:30px; }
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height:0; }]] },
-            ui:Label{ ID = "PatLabel", Weight = 0, StyleSheet = "color:#c9352b; font-weight:600; letter-spacing:1px; margin-top:8px;",
-                Text = "УЗОР ПИКСЕЛЕЙ" .. ((PAT_NAMES[curPat + 1] and ("  ·  " .. PAT_NAMES[curPat + 1])) or "") },
-            ui:VGroup{ Weight = 0, Spacing = 6, tunpack(patRows) },
+            ui:Label{ Weight = 0, StyleSheet = "color:#c9352b; font-weight:600; letter-spacing:1px; margin-top:8px;",
+                Text = "КРИВАЯ СКОРОСТИ" },
+            ui:HGroup{ Weight = 0, Spacing = 6, tunpack(modeCells) },
+            ui:Label{ Weight = 0, StyleSheet = "color:#c9352b; font-weight:600; letter-spacing:1px; margin-top:4px;",
+                Text = "МОДУЛИ" },
+            ui:HGroup{ Weight = 0, Spacing = 6, tunpack(togCells) },
             ui:VGap(0, 1),
             ui:LineEdit{ ID = "NameEdit", PlaceholderText = "Название пресета", Weight = 0,
                 Text = selected and selected.name or "" },
@@ -252,7 +258,7 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height:0; }]] },
             },
             ui:Button{ ID = "BtnThumb", Text = "Снять превью с текущего кадра (для своего ★)", StyleSheet = btnStyle(WHITE), Weight = 0 },
             ui:Label{ ID = "Status", Text = statusText, Weight = 0, WordWrap = true, StyleSheet = "color:#d0584d;" },
-            ui:Label{ Text = DEMO and "CRT PRO  ·  DEMO  ·  by STORYVERSE" or "CRT PRO  ·  by STORYVERSE", Weight = 0, Alignment = { AlignHCenter = true },
+            ui:Label{ Text = DEMO and "FLOW PRO  ·  DEMO  ·  by STORYVERSE" or "FLOW PRO  ·  by STORYVERSE", Weight = 0, Alignment = { AlignHCenter = true },
                 StyleSheet = "color:#6a6a68; font-size:10px; letter-spacing:1px;" },
         },
     })
@@ -261,7 +267,7 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height:0; }]] },
     local function status(s) statusText = s; itm.Status.Text = s end
     local function valuesOf(it)
         if it.kind == "builtin" then return builtinValues(it.index) end
-        local t = bmd.readfile(PRESET_DIR .. it.name .. ".crtpreset")
+        local t = bmd.readfile(PRESET_DIR .. it.name .. ".flowpreset")
         return type(t) == "table" and t or nil
     end
     local function apply(it)
@@ -304,13 +310,21 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height:0; }]] },
         apply(it)
     end
 
-    for i = 0, 9 do
-        win.On["pat_" .. i].Clicked = function()
-            pcall(function() tool:SetInput("PixPattern", i) end)
-            pcall(function() tool:SetInput("PixOn", 1) end)
-            for j = 0, 9 do pcall(function() itm["pat_" .. j].StyleSheet = (j == i) and PAT_SEL or PAT end) end
-            itm.PatLabel.Text = "УЗОР ПИКСЕЛЕЙ  ·  " .. (PAT_NAMES[i + 1] or "")
-            status("Узор: " .. (PAT_NAMES[i + 1] or i))
+    for i = 0, 5 do
+        win.On["mode_" .. i].Clicked = function()
+            pcall(function() tool:SetInput("RampType", i) end)
+            pcall(function() tool:SetInput("RampOn", 1) end)
+            for j = 0, 5 do pcall(function() itm["mode_" .. j].StyleSheet = (j == i) and CV_ON or CV end) end
+            pcall(function() itm.tog_1.StyleSheet = QB_ON end)
+            status("Кривая скорости: " .. (CURVES[i + 1] or i))
+        end
+    end
+    for i, tg in ipairs(TOGGLES) do
+        win.On["tog_" .. i].Clicked = function()
+            local on = getv(tg[1]) > 0.5 and 0 or 1
+            pcall(function() tool:SetInput(tg[1], on) end)
+            pcall(function() itm["tog_" .. i].StyleSheet = (on == 1) and QB_ON or QB end)
+            status(tg[2] .. (on == 1 and ": включено" or ": выключено"))
         end
     end
 
@@ -333,7 +347,7 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height:0; }]] },
         name = cleanName(name)
         if name == "" then status("Введи название в поле выше.") return end
         bmd.createdir(PRESET_DIR)
-        bmd.writefile(PRESET_DIR .. name .. ".crtpreset", t)
+        bmd.writefile(PRESET_DIR .. name .. ".flowpreset", t)
         -- превью: текущий кадр из вьюера Resolve (Resolve 18+)
         local shot = false
         pcall(function()
@@ -356,7 +370,7 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height:0; }]] },
         local cb = ""
         pcall(function() local x = bmd.getclipboard(); if type(x) == "string" then cb = x end end)
         local t = fromCode(cb)
-        if not t then status("В буфере нет кода CRT Pro (CRTPRO1;...).") return end
+        if not t then status("В буфере нет кода Flow Pro (FLOWPRO1;...).") return end
         saveAs(itm.NameEdit.Text, t)
     end
 
@@ -365,10 +379,10 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height:0; }]] },
         if not selected or selected.kind ~= "own" then status("Переименовать можно только свой пресет (★).") return end
         local new = cleanName(itm.NameEdit.Text)
         if new == "" or new == selected.name then status("Впиши новое название в поле.") return end
-        local t = bmd.readfile(PRESET_DIR .. selected.name .. ".crtpreset")
+        local t = bmd.readfile(PRESET_DIR .. selected.name .. ".flowpreset")
         if type(t) ~= "table" then status("Не удалось прочитать пресет.") return end
-        bmd.writefile(PRESET_DIR .. new .. ".crtpreset", t)
-        os.remove(PRESET_DIR .. selected.name .. ".crtpreset")
+        bmd.writefile(PRESET_DIR .. new .. ".flowpreset", t)
+        os.remove(PRESET_DIR .. selected.name .. ".flowpreset")
         os.rename(PRESET_DIR .. selected.name .. ".png", PRESET_DIR .. new .. ".png")
         statusText = "Переименован в «" .. new .. "»."
         selected = { kind = "own", name = new }
@@ -389,14 +403,14 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height:0; }]] },
     function win.On.BtnDelete.Clicked()
         if DEMO then status("Свои пресеты — " .. DEMO_MSG) return end
         if not selected or selected.kind ~= "own" then status("Удалить можно только свой пресет (★).") return end
-        os.remove(PRESET_DIR .. selected.name .. ".crtpreset")
+        os.remove(PRESET_DIR .. selected.name .. ".flowpreset")
         os.remove(PRESET_DIR .. selected.name .. ".png")
         statusText = "Удалён «" .. selected.name .. "»."
         selected = nil
         restart()
     end
 
-    function win.On.CRTPresetsWin.Close() reopen = false; disp:ExitLoop() end
+    function win.On.FlowPresetsWin.Close() reopen = false; disp:ExitLoop() end
     win:Show()
     disp:RunLoop()
     win:Hide()
