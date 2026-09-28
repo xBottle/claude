@@ -30,6 +30,11 @@
 Окно пресетов `VHS Presets.lua` (копия окна CRT: вместо узоров — кнопки режима магнитофона и быстрые тумблеры), данные `vhs_pro_data.lua` пишет build_vhs_pro.py.
 Пути: `Effects/STORYVERSE/VHS/`, Fuses/VHSCore.fuse, `Scripts/Comp/vhs-pro/`. В демо окна нет.
 
+## Папки в Resolve: работа vs публикация (правило заказчика)
+- В разработке эффект ставится в Effects → **Claude** → <КОД> (наша рабочая папка; там же другие рабочие эффекты — не удалять).
+- В **STORYVERSE** → <КОД> эффект попадает ТОЛЬКО из релизного архива (make_release.py / установщик покупателя).
+- Новый набор: сначала рабочая сборка в Claude/<КОД>, релиз — через make_release.py с путями STORYVERSE.
+
 ## Единый стиль — `davinci-plugins/STYLE.md` + `storyverse_style.py`
 Обложки, иконки библиотеки, листы пресетов, шапки окон — только через storyverse_style.py.
 ⚠ Фото в store_assets/scene.png у CRT (огонь) и VHS (клип) — ВРЕМЕННЫЕ, заказчик пришлёт финальные; таблица замены в STYLE.md.
